@@ -43,9 +43,21 @@
     }
 
     if (!response.ok) {
-      throw new Error(
-        data.error || data.message || `Request failed (${response.status})`
-      );
+      const detail = data.error ?? data.message;
+      let message;
+
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (detail && typeof detail === "object") {
+        message =
+          (typeof detail.message === "string" && detail.message) ||
+          (typeof detail.error === "string" && detail.error) ||
+          JSON.stringify(detail);
+      } else {
+        message = `Request failed (${response.status})`;
+      }
+
+      throw new Error(message);
     }
 
     return data;

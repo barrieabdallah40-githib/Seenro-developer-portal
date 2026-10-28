@@ -224,6 +224,51 @@
       const projectList = element("div", {
         className: "portal-project-list"
       });
+
+      const keyHeading = element("h3", {}, "API keys");
+      const keyList = element("div", {
+        className: "portal-project-list"
+      });
+      const createdKeyPanel = element("div", {
+        className: "portal-project-list"
+      });
+      const keyForm = element("form", {
+        className: "portal-form"
+      });
+      const keyNameField = field("API key name", "keyName");
+      const scopeFields = element("div", {
+        className: "portal-actions"
+      });
+
+      function scopeCheckbox(scope, checked = false) {
+        const label = element("label", {
+          className: "portal-field"
+        });
+        const checkbox = element("input", {
+          type: "checkbox",
+          name: "scope",
+          value: scope
+        });
+        checkbox.checked = checked;
+        label.append(checkbox, element("span", {}, scope));
+        return label;
+      }
+
+      scopeFields.append(
+        scopeCheckbox("notes:read", true),
+        scopeCheckbox("notes:write")
+      );
+
+      keyForm.append(
+        keyNameField,
+        scopeFields,
+        element("button", {
+          type: "submit",
+          className: "primary-button"
+        }, "Create API key")
+      );
+
+      const refreshKeys = button("Refresh API keys", loadKeys);
       const createForm = element("form", {
         className: "portal-form"
       });
@@ -268,6 +313,122 @@
           submit.disabled = false;
         }
       });
+
+      keyForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const submit = keyForm.querySelector('button[type="submit"]');
+        const name = formField(keyForm, "keyName");
+        const scopes = Array.from(
+          keyForm.querySelectorAll('input[name="scope"]:checked')
+        ).map((checkbox) => checkbox.value);
+
+        submit.disabled = true;
+
+        try {
+          const result = await api("/keys", {
+            method: "POST",
+            body: JSON.stringify({ name, scopes })
+          });
+
+          createdKeyPanel.replaceChildren(
+            element("h4", {}, "Your new API key — copy it now"),
+            element("p", {}, result.warning ||
+              "This secret will not be shown again.")
+          );
+
+          const secretInput = element("input", {
+            type: "text",
+            readOnly: "readonly",
+            autocomplete: "off",
+            "aria-label": "New API key secret"
+          });
+          secretInput.value = result.api_key || "";
+
+          const copyKey = button("Copy API key", async () => {
+            try {
+              await navigator.clipboard.writeText(secretInput.value);
+              showMessage("API key copied. Keep it private.");
+            } catch {
+              secretInput.focus();
+              secretInput.select();
+              showMessage("Select and copy the API key manually.");
+            }
+          });
+
+          createdKeyPanel.append(secretInput, copyKey);
+          keyForm.reset();
+          keyForm.querySelector('input[value="notes:read"]').checked = true;
+          showMessage("API key created. Copy the secret now.");
+          await loadKeys();
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      async function loadKeys() {
+        keyList.replaceChildren(element("p", {}, "Loading API keys…"));
+
+        try {
+          const result = await api("/keys");
+          const keys = Array.isArray(result.keys) ? result.keys : [];
+          keyList.replaceChildren();
+
+          if (keys.length === 0) {
+            keyList.append(element("p", {}, "No API keys yet."));
+            return;
+          }
+
+          for (const key of keys) {
+            const row = element("article", {
+              className: "portal-project"
+            });
+
+            row.append(
+              element("strong", {}, key.name),
+              element("span", {}, `Prefix: ${key.prefix}`),
+              element("span", {}, `Scopes: ${(key.scopes || []).join(", ")}`),
+              element("span", {}, `Created: ${key.created_at || "Unknown"}`),
+              element("span", {}, `Last used: ${key.last_used_at || "Never"}`),
+              element("span", {}, key.revoked_at
+                ? `Revoked: ${key.revoked_at}`
+                : "Status: Active")
+            );
+
+            if (!key.revoked_at) {
+              row.append(button("Revoke key", async () => {
+                if (!window.confirm(
+                  `Revoke API key "${key.name}"? This cannot be undone.`
+                )) {
+                  return;
+                }
+
+                try {
+                  await api(`/keys/${encodeURIComponent(key.id)}`, {
+                    method: "DELETE"
+                  });
+                  showMessage("API key revoked.");
+                  await loadKeys();
+                } catch (error) {
+                  showMessage(error.message, true);
+                }
+              }, "portal-danger"));
+            }
+
+            keyList.append(row);
+          }
+        } catch (error) {
+          keyList.replaceChildren();
+          showMessage(error.message, true);
+
+          if (/unauthorized|invalid session/i.test(error.message)) {
+            session.clear();
+            renderAuth();
+          }
+        }
+      }
 
       async function loadProjects() {
         projectList.replaceChildren(
@@ -332,6 +493,11 @@
       panel.append(
         heading,
         createForm,
+        keyHeading,
+        keyForm,
+        createdKeyPanel,
+        refreshKeys,
+        keyList,
         element("h3", {}, "Project list"),
         refresh,
         projectList,
@@ -339,6 +505,7 @@
       );
 
       await loadProjects();
+      await loadKeys();
     }
 
     if (session.get()) {

@@ -2,3 +2,4 @@
 .env
 .env.*
 .vercel
+app.js.before-token-fix

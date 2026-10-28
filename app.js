@@ -236,6 +236,21 @@
         className: "portal-form"
       });
       const keyNameField = field("API key name", "keyName");
+      const projectSelect = element("select", {
+        name: "project_id",
+        required: "required"
+      });
+      projectSelect.append(
+        element("option", { value: "" }, "Select a project")
+      );
+      const projectField = element("label", {
+        className: "portal-field"
+      });
+      projectField.append(
+        element("span", {}, "Project"),
+        projectSelect
+      );
+
       const scopeFields = element("div", {
         className: "portal-actions"
       });
@@ -261,6 +276,7 @@
 
       keyForm.append(
         keyNameField,
+        projectField,
         scopeFields,
         element("button", {
           type: "submit",
@@ -328,7 +344,11 @@
         try {
           const result = await api("/keys", {
             method: "POST",
-            body: JSON.stringify({ name, scopes })
+            body: JSON.stringify({
+            name,
+            project_id: Number(projectSelect.value),
+            scopes
+          })
           });
 
           createdKeyPanel.replaceChildren(
@@ -442,6 +462,20 @@
           const projects = Array.isArray(result.projects)
             ? result.projects
             : [];
+
+          projectSelect.replaceChildren(
+            element("option", { value: "" }, "Select a project")
+          );
+
+          for (const project of projects) {
+            projectSelect.append(
+              element(
+                "option",
+                { value: String(project.id) },
+                project.name
+              )
+            );
+          }
 
           if (projects.length === 0) {
             projectList.append(

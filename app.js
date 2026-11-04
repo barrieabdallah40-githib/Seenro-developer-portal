@@ -82,6 +82,23 @@
   }
 
   function init() {
+    const page = document.body.dataset.page || "public";
+
+    if (page === "public") {
+      const url = new URL(window.location.href);
+      if (
+        url.searchParams.has("verify_email") ||
+        url.searchParams.has("reset_password")
+      ) {
+        window.location.replace(
+          "login.html" + url.search + url.hash
+        );
+      }
+      return;
+    }
+
+    if (!["login", "register", "dashboard"].includes(page)) return;
+
     const main = document.querySelector("main");
     if (!main) return;
 
@@ -91,8 +108,18 @@
     });
 
     section.append(
-      element("p", { className: "eyebrow" }, "DEVELOPER WORKSPACE"),
-      element("h2", {}, "Your developer account")
+      element(
+        "p",
+        { className: "eyebrow" },
+        page === "dashboard" ? "DEVELOPER WORKSPACE" : "DEVELOPER ACCOUNT"
+      ),
+      element(
+        "h2",
+        {},
+        page === "dashboard"
+          ? "Your developer workspace"
+          : page === "register" ? "Create your account" : "Welcome back"
+      )
     );
 
     const status = element("p", {
@@ -104,34 +131,6 @@
     const panel = element("div", { className: "portal-panel" });
     section.append(status, panel);
     main.append(section);
-
-    const developerApiCard = document.querySelector(".api-card.featured");
-    if (developerApiCard) {
-      developerApiCard.setAttribute("role", "link");
-      developerApiCard.setAttribute("tabindex", "0");
-      developerApiCard.setAttribute(
-        "aria-label",
-        "Open Developer API registration or workspace"
-      );
-
-      const openDeveloperWorkspace = () => {
-        section.scrollIntoView({ behavior: "smooth", block: "start" });
-        if (!session.get()) {
-          renderAuth("register");
-          const emailInput = panel.querySelector('input[name="email"]');
-          if (emailInput) emailInput.focus();
-        }
-      };
-
-      developerApiCard.addEventListener("click", openDeveloperWorkspace);
-      developerApiCard.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          openDeveloperWorkspace();
-        }
-      });
-    }
-
 
     function showMessage(message, isError = false) {
       status.textContent = message;
@@ -167,10 +166,9 @@
       return form.elements.namedItem(name)?.value.trim() ?? "";
     }
 
-    function renderAuth(initialMode = "login") {
+    function renderAuth(initialMode = (page === "register" ? "register" : "login")) {
       panel.replaceChildren();
 
-      const tabs = element("div", { className: "portal-actions" });
       const form = element("form", { className: "portal-form" });
       let mode = initialMode === "register" ? "register" : "login";
 
@@ -194,11 +192,6 @@
       }
 
       setMode(mode);
-
-      tabs.append(
-        button("Sign in", () => setMode("login")),
-        button("Register", () => setMode("register"))
-      );
 
       form.append(heading, email, password, submit);
 
@@ -286,9 +279,7 @@
           );
 
           if (mode === "register") {
-            setMode("login");
-            showMessage(result.message ||
-              "Registration received. Check your email for a verification link before signing in.");
+            window.location.replace("login.html?registered=1");
             return;
           }
 
@@ -300,8 +291,8 @@
           }
 
           session.set(token);
-          await renderWorkspace();
-          showMessage("Signed in successfully.");
+          window.location.replace("dashboard.html");
+          return;
         } catch (error) {
           if (error.code === "email_not_verified") {
             showMessage(
@@ -316,8 +307,37 @@
         }
       });
 
-      recovery.append(forgotForm, resendForm);
-      panel.append(tabs, form, recovery);
+      panel.append(form);
+
+      const switchText = element("p", {
+        className: "portal-auth-switch"
+      });
+
+      if (mode === "login") {
+        switchText.append(
+          document.createTextNode("Don't have an account? "),
+          element("a", { href: "register.html" }, "Create one")
+        );
+      } else {
+        switchText.append(
+          document.createTextNode("Already registered? "),
+          element("a", { href: "login.html" }, "Sign in")
+        );
+      }
+
+      panel.append(switchText);
+
+      if (mode === "login") {
+        recovery.append(forgotForm, resendForm);
+        panel.append(recovery);
+      }
+
+      if (
+        mode === "login" &&
+        new URLSearchParams(window.location.search).get("registered") === "1"
+      ) {
+        showMessage("Registration received. Check your email for a verification link before signing in.");
+      }
     }
 
     function renderResetForm(token) {
@@ -340,7 +360,7 @@
         passwordField,
         confirmationField,
         submit,
-        button("Back to sign in", () => renderAuth(), "portal-secondary-button")
+        button("Back to sign in", () => renderAuth("login"), "portal-secondary-button")
       );
 
       form.addEventListener("submit", async (event) => {
@@ -367,7 +387,7 @@
             body: JSON.stringify({ token, password: passwordValue })
           });
           session.clear();
-          renderAuth();
+          renderAuth("login");
           showMessage(result.message || "Password reset successfully. You can now sign in.");
         } catch (error) {
           showMessage(error.message, true);
@@ -393,7 +413,7 @@
 
       if (verifyToken) {
         session.clear();
-        renderAuth();
+        renderAuth("login");
         showMessage("Verifying your email…");
         try {
           const result = await api("/verify-email", {
@@ -413,10 +433,17 @@
       return true;
     }
 
+    function handleWorkspaceError(error) {
+      showMessage(error.message || "The workspace request failed.", true);
+      if (error.status === 401) {
+        session.clear();
+        window.location.replace("login.html");
+      }
+    }
+
     async function renderWorkspace() {
       if (!session.get()) {
-        panel.replaceChildren();
-        renderAuth();
+        window.location.replace("login.html");
         return;
       }
 
@@ -511,8 +538,7 @@
           // Clear the local session even if the server logout request fails.
         }
         session.clear();
-        renderAuth();
-        showMessage("Signed out.");
+        window.location.replace("login.html");
       });
 
       createForm.addEventListener("submit", async (event) => {
@@ -530,7 +556,7 @@
           showMessage("Project created.");
           await loadProjects();
         } catch (error) {
-          showMessage(error.message, true);
+          handleWorkspaceError(error);
         } finally {
           submit.disabled = false;
         }
@@ -588,7 +614,7 @@
           showMessage("API key created. Copy the secret now.");
           await loadKeys();
         } catch (error) {
-          showMessage(error.message, true);
+          handleWorkspaceError(error);
         } finally {
           submit.disabled = false;
         }
@@ -638,7 +664,7 @@
                   showMessage("API key revoked.");
                   await loadKeys();
                 } catch (error) {
-                  showMessage(error.message, true);
+                  handleWorkspaceError(error);
                 }
               }, "portal-danger"));
             }
@@ -647,12 +673,8 @@
           }
         } catch (error) {
           keyList.replaceChildren();
-          showMessage(error.message, true);
+          handleWorkspaceError(error);
 
-          if (/unauthorized|invalid session/i.test(error.message)) {
-            session.clear();
-            renderAuth();
-          }
         }
       }
 
@@ -704,12 +726,8 @@
           }
         } catch (error) {
           projectList.replaceChildren();
-          showMessage(error.message, true);
+          handleWorkspaceError(error);
 
-          if (/unauthorized|invalid session/i.test(error.message)) {
-            session.clear();
-            renderAuth();
-          }
         }
       }
 
@@ -734,19 +752,36 @@
     handleEmailLink().then((handled) => {
       if (handled) return;
 
-      if (session.get()) {
-        renderWorkspace().catch((error) => {
+      if (page === "dashboard") {
+        if (!session.get()) {
+          window.location.replace("login.html");
+          return;
+        }
+
+        renderWorkspace().catch(() => {
           session.clear();
-          renderAuth();
-          showMessage(error.message, true);
+          window.location.replace("login.html");
         });
-      } else {
-        renderAuth();
+        return;
       }
+
+      if (session.get()) {
+        window.location.replace("dashboard.html");
+        return;
+      }
+
+      renderAuth(page);
     }).catch((error) => {
       session.clear();
-      renderAuth();
-      showMessage(error.message || "Unable to process the email link.", true);
+      if (page === "dashboard") {
+        window.location.replace("login.html");
+        return;
+      }
+      renderAuth("login");
+      showMessage(
+        error.message || "Unable to process the email link.",
+        true
+      );
     });
   }
 

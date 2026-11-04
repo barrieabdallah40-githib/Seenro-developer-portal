@@ -367,7 +367,6 @@
             body: JSON.stringify({ token, password: passwordValue })
           });
           session.clear();
-          showMessage(result.message || "Password reset successfully. You can now sign in.");
           renderAuth();
           showMessage(result.message || "Password reset successfully. You can now sign in.");
         } catch (error) {
@@ -476,7 +475,9 @@
         scopeCheckbox("projects:read", true),
         scopeCheckbox("projects:write"),
         scopeCheckbox("data:read"),
-        scopeCheckbox("data:write")
+        scopeCheckbox("data:write"),
+        scopeCheckbox("auth:read"),
+        scopeCheckbox("auth:write")
       );
 
       keyForm.append(
@@ -698,23 +699,6 @@
               element("strong", {}, project.name),
               element("span", {}, `Project ID: ${project.id}`)
             );
-
-            row.append(button("Delete", async () => {
-              if (!window.confirm(`Delete project "${project.name}"?`)) {
-                return;
-              }
-
-              try {
-                await api(
-                  `/developer/projects/${encodeURIComponent(project.id)}`,
-                  { method: "DELETE" }
-                );
-                showMessage("Project deleted.");
-                await loadProjects();
-              } catch (error) {
-                showMessage(error.message, true);
-              }
-            }, "portal-danger"));
 
             projectList.append(row);
           }

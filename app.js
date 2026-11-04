@@ -57,7 +57,10 @@
         message = `Request failed (${response.status})`;
       }
 
-      throw new Error(message);
+      const error = new Error(message);
+      error.status = response.status;
+      error.code = typeof data.code === "string" ? data.code : "";
+      throw error;
     }
 
     return data;
@@ -169,6 +172,72 @@
 
       form.append(heading, email, password, submit);
 
+      const recovery = element("div", { className: "portal-auth-tools" });
+      const forgotForm = element("form", { className: "portal-form" });
+      forgotForm.append(
+        element("h3", {}, "Forgot your password?"),
+        field("Account email address", "forgot_email", "email"),
+        element("button", {
+          type: "submit",
+          className: "portal-secondary-button"
+        }, "Send password reset link")
+      );
+
+      forgotForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const control = forgotForm.querySelector('button[type="submit"]');
+        control.disabled = true;
+        showMessage("Requesting password reset…");
+        try {
+          const result = await api("/forgot-password", {
+            method: "POST",
+            body: JSON.stringify({
+              email: formField(forgotForm, "forgot_email")
+            })
+          });
+          showMessage(result.message ||
+            "If an eligible account exists, password reset instructions will be sent.");
+          forgotForm.reset();
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          control.disabled = false;
+        }
+      });
+
+      const resendForm = element("form", { className: "portal-form" });
+      resendForm.append(
+        element("h3", {}, "Email verification"),
+        element("p", {}, "Didn't receive your verification email? Request another link."),
+        field("Account email address", "resend_email", "email"),
+        element("button", {
+          type: "submit",
+          className: "portal-secondary-button"
+        }, "Resend verification email")
+      );
+
+      resendForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const control = resendForm.querySelector('button[type="submit"]');
+        control.disabled = true;
+        showMessage("Requesting verification email…");
+        try {
+          const result = await api("/resend-verification", {
+            method: "POST",
+            body: JSON.stringify({
+              email: formField(resendForm, "resend_email")
+            })
+          });
+          showMessage(result.message ||
+            "If verification is required for that account, an email will be sent.");
+          resendForm.reset();
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          control.disabled = false;
+        }
+      });
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         submit.disabled = true;
@@ -187,20 +256,16 @@
           );
 
           if (mode === "register") {
-            showMessage(
-              result.message ||
-              "Registration request succeeded. Please sign in."
-            );
             setMode("login");
+            showMessage(result.message ||
+              "Registration received. Check your email for a verification link before signing in.");
             return;
           }
 
           const token = result.token;
-
           if (!token) {
             throw new Error(
-              "The login response did not contain the expected token field. " +
-              "No session was saved. Verify the Core login response format."
+              "The login response did not contain the expected token field. No session was saved."
             );
           }
 
@@ -208,16 +273,124 @@
           await renderWorkspace();
           showMessage("Signed in successfully.");
         } catch (error) {
+          if (error.code === "email_not_verified") {
+            showMessage(
+              "Please verify your email before signing in. You can request another verification email below.",
+              true
+            );
+          } else {
+            showMessage(error.message, true);
+          }
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      recovery.append(forgotForm, resendForm);
+      panel.append(tabs, form, recovery);
+    }
+
+    function renderResetForm(token) {
+      panel.replaceChildren();
+
+      const form = element("form", { className: "portal-form" });
+      const passwordField = field("New password (8–128 characters)", "password", "password");
+      passwordField.querySelector("input").autocomplete = "new-password";
+
+      const confirmationField = field("Confirm new password", "confirm_password", "password");
+      confirmationField.querySelector("input").autocomplete = "new-password";
+
+      const submit = element("button", {
+        type: "submit",
+        className: "primary-button"
+      }, "Reset password");
+
+      form.append(
+        element("h3", {}, "Choose a new password"),
+        passwordField,
+        confirmationField,
+        submit,
+        button("Back to sign in", () => renderAuth(), "portal-secondary-button")
+      );
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const passwordValue = formField(form, "password");
+        const confirmation = formField(form, "confirm_password");
+
+        if (passwordValue !== confirmation) {
+          showMessage("The passwords do not match.", true);
+          return;
+        }
+
+        if (passwordValue.length < 8 || new TextEncoder().encode(passwordValue).length > 128) {
+          showMessage("Password must be between 8 and 128 bytes.", true);
+          return;
+        }
+
+        submit.disabled = true;
+        showMessage("Updating your password…");
+
+        try {
+          const result = await api("/reset-password", {
+            method: "POST",
+            body: JSON.stringify({ token, password: passwordValue })
+          });
+          session.clear();
+          showMessage(result.message || "Password reset successfully. You can now sign in.");
+          renderAuth();
+          showMessage(result.message || "Password reset successfully. You can now sign in.");
+        } catch (error) {
           showMessage(error.message, true);
         } finally {
           submit.disabled = false;
         }
       });
 
-      panel.append(tabs, form);
+      panel.append(form);
+    }
+
+    async function handleEmailLink() {
+      const url = new URL(window.location.href);
+      const verifyToken = url.searchParams.get("verify_email");
+      const resetToken = url.searchParams.get("reset_password");
+
+      if (!verifyToken && !resetToken) return false;
+
+      // Remove sensitive tokens from browser history and the visible URL immediately.
+      url.searchParams.delete("verify_email");
+      url.searchParams.delete("reset_password");
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+
+      if (verifyToken) {
+        session.clear();
+        renderAuth();
+        showMessage("Verifying your email…");
+        try {
+          const result = await api("/verify-email", {
+            method: "POST",
+            body: JSON.stringify({ token: verifyToken })
+          });
+          showMessage(result.message || "Email verified successfully. You can now sign in.");
+        } catch (error) {
+          showMessage(error.message || "This verification link is invalid or expired.", true);
+        }
+        return true;
+      }
+
+      session.clear();
+      renderResetForm(resetToken);
+      showMessage("Enter and confirm your new password.");
+      return true;
     }
 
     async function renderWorkspace() {
+      if (!session.get()) {
+        panel.replaceChildren();
+        renderAuth();
+        return;
+      }
+
       panel.replaceChildren();
 
       const heading = element("h3", {}, "Your projects");
@@ -542,15 +715,23 @@
       await loadKeys();
     }
 
-    if (session.get()) {
-      renderWorkspace().catch((error) => {
-        session.clear();
+    handleEmailLink().then((handled) => {
+      if (handled) return;
+
+      if (session.get()) {
+        renderWorkspace().catch((error) => {
+          session.clear();
+          renderAuth();
+          showMessage(error.message, true);
+        });
+      } else {
         renderAuth();
-        showMessage(error.message, true);
-      });
-    } else {
+      }
+    }).catch((error) => {
+      session.clear();
       renderAuth();
-    }
+      showMessage(error.message || "Unable to process the email link.", true);
+    });
   }
 
   if (document.readyState === "loading") {

@@ -319,3 +319,59 @@ footer a { color: var(--text); text-decoration: none; }
   outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
+
+
+/* Separate public and authenticated portal pages */
+.top-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.nav-register {
+  display: inline-block;
+  padding: .65rem .9rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.portal-auth-switch {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.portal-auth-switch a {
+  color: var(--accent);
+}
+
+.portal-field select,
+.portal-field input[readonly] {
+  box-sizing: border-box;
+  width: 100%;
+  padding: .8rem;
+  border: 1px solid rgba(127,127,127,.45);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.portal-field select option {
+  color: #111;
+}
+
+.api-card.featured {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .top-nav {
+    gap: .65rem;
+  }
+}

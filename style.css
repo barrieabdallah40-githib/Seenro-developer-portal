@@ -309,3 +309,13 @@ footer a { color: var(--text); text-decoration: none; }
 .portal-message[data-state="error"] {
   color: #ff8d8d;
 }
+
+/* Interactive Developer API card */
+.api-card.featured:hover {
+  border-color: var(--accent);
+}
+
+.api-card.featured:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}

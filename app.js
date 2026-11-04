@@ -105,6 +105,34 @@
     section.append(status, panel);
     main.append(section);
 
+    const developerApiCard = document.querySelector(".api-card.featured");
+    if (developerApiCard) {
+      developerApiCard.setAttribute("role", "link");
+      developerApiCard.setAttribute("tabindex", "0");
+      developerApiCard.setAttribute(
+        "aria-label",
+        "Open Developer API registration or workspace"
+      );
+
+      const openDeveloperWorkspace = () => {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (!session.get()) {
+          renderAuth("register");
+          const emailInput = panel.querySelector('input[name="email"]');
+          if (emailInput) emailInput.focus();
+        }
+      };
+
+      developerApiCard.addEventListener("click", openDeveloperWorkspace);
+      developerApiCard.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDeveloperWorkspace();
+        }
+      });
+    }
+
+
     function showMessage(message, isError = false) {
       status.textContent = message;
       status.dataset.state = isError ? "error" : "success";
@@ -139,12 +167,12 @@
       return form.elements.namedItem(name)?.value.trim() ?? "";
     }
 
-    function renderAuth() {
+    function renderAuth(initialMode = "login") {
       panel.replaceChildren();
 
       const tabs = element("div", { className: "portal-actions" });
       const form = element("form", { className: "portal-form" });
-      let mode = "login";
+      let mode = initialMode === "register" ? "register" : "login";
 
       const heading = element("h3", {}, "Sign in");
       const email = field("Email address", "email", "email");
@@ -164,6 +192,8 @@
           mode === "login" ? "current-password" : "new-password";
         showMessage("");
       }
+
+      setMode(mode);
 
       tabs.append(
         button("Sign in", () => setMode("login")),
@@ -443,8 +473,10 @@
       }
 
       scopeFields.append(
-        scopeCheckbox("notes:read", true),
-        scopeCheckbox("notes:write")
+        scopeCheckbox("projects:read", true),
+        scopeCheckbox("projects:write"),
+        scopeCheckbox("data:read"),
+        scopeCheckbox("data:write")
       );
 
       keyForm.append(
@@ -551,7 +583,7 @@
 
           createdKeyPanel.append(secretInput, copyKey);
           keyForm.reset();
-          keyForm.querySelector('input[value="notes:read"]').checked = true;
+          keyForm.querySelector('input[value="projects:read"]').checked = true;
           showMessage("API key created. Copy the secret now.");
           await loadKeys();
         } catch (error) {

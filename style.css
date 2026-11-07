@@ -426,3 +426,35 @@ footer a { color: var(--text); text-decoration: none; }
 .docs-section a.primary-button {
   color: #07150f;
 }
+
+/* SEENRO storage file manager */
+.portal-project > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: .45rem;
+}
+
+.portal-project > div:first-child strong {
+  overflow-wrap: anywhere;
+}
+
+.portal-project > div:first-child span {
+  overflow-wrap: anywhere;
+}
+
+.portal-field input[type="file"] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: .65rem;
+  border: 1px solid rgba(127,127,127,.45);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.portal-form button:disabled {
+  opacity: .6;
+  cursor: wait;
+}

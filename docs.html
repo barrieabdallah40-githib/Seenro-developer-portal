@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1020"><meta name="description" content="SEENRO Core API documentation, storage packages, and roadmap.">
+<title>Documentation | SEENRO Developer Portal</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="topbar"><a class="brand" href="index.html"><span class="brand-mark">S</span><span>SEENRO <small>TECHNOLOGY</small></span></a>
+<nav class="top-nav"><a class="back-link" href="index.html">Overview</a><a class="back-link" href="login.html">Sign in</a><a class="nav-register" href="register.html">Create account</a></nav></header>
+<main class="docs-main">
+<section class="docs-hero"><p class="eyebrow">SEENRO CORE · API REFERENCE</p><h1>Build on the <span>foundation.</span></h1>
+<p class="intro">A practical guide to the deployed SEENRO Core foundation, project access, data APIs, and developer storage.</p>
+<p class="docs-meta">API base URL <code>https://api.seenrotech.com/api/v1</code></p>
+<p class="docs-caution">SEENRO is in early access. Route availability does not mean every integration has passed a live end-to-end test. Review status notes before relying on payment, email, or storage workflows in production.</p></section>
+<nav class="docs-toc"><a href="#status">Status</a><a href="#quickstart">Quick start</a><a href="#auth">Authentication</a><a href="#projects">Projects and data</a><a href="#storage">Storage API</a><a href="#plans">Monthly plans</a><a href="#roadmap">Roadmap</a></nav>
+
+<section class="docs-section" id="status"><p class="eyebrow">01 · CURRENT STATUS</p><h2>What is available now</h2><div class="docs-grid">
+<article class="docs-card"><h3>Developer accounts</h3><p>Registration, login, logout, email-verification and password-recovery endpoints are integrated into the portal.</p><span class="status">Core integration</span></article>
+<article class="docs-card"><h3>Project management</h3><p>Create and list developer projects. Project deletion is disabled to protect project data.</p><span class="status">Available</span></article>
+<article class="docs-card"><h3>Project API keys</h3><p>Create, list, and revoke project-bound keys with supported project, data, and auth scopes.</p><span class="status">Available</span></article>
+<article class="docs-card"><h3>Project data records</h3><p>Scoped collection-record operations are available through the Developer API.</p><span class="status">Available</span></article>
+<article class="docs-card"><h3>Developer storage</h3><p>Core includes checkout, storage-key management, object upload/download/list/delete, and usage routes.</p><span class="status">API deployed · verify integrations</span></article>
+<article class="docs-card"><h3>Email and payments</h3><p>Email delivery and Monime settlement depend on configured providers and successful end-to-end verification.</p><span class="status">Provider-dependent</span></article>
+</div><p class="docs-note">The deployed Core service, binary, and database initialization were verified. That does not prove live email delivery, Monime settlement, file upload, or subscription renewal has passed an end-to-end test.</p></section>
+
+<section class="docs-section" id="quickstart"><p class="eyebrow">02 · GET STARTED</p><h2>Quick start</h2><ol class="docs-steps">
+<li><strong>Create an account.</strong> Register in the <a href="register.html">developer portal</a>; complete email verification if enabled.</li>
+<li><strong>Create a project.</strong> Sign in and create a project in your workspace.</li>
+<li><strong>Create a project API key.</strong> Select only the scopes your trusted server needs.</li>
+<li><strong>Store the secret safely.</strong> The full key is shown only at creation. Save it in a server-side secret manager.</li>
+<li><strong>Call the API.</strong> Use the API base URL and endpoint-specific authentication method.</li></ol>
+<p class="docs-warning">Never put a secret project API key in browser JavaScript, a public repository, or a mobile application bundle.</p></section>
+
+<section class="docs-section" id="auth"><p class="eyebrow">03 · ACCESS CONTROL</p><h2>Authentication and API keys</h2>
+<h3>Developer session</h3><p>The portal uses a developer login session to manage that developer's projects and API keys. These management calls use the session as a Bearer token.</p>
+<h3>Project-bound developer API keys</h3><p>Keys are project-bound. Core stores a hash; the full secret is returned only at creation. They are intended for trusted server-to-server use. Core checks project association and assigned permissions.</p>
+<table class="docs-table"><thead><tr><th>Scope</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>projects:read</code></td><td>Read permitted project information.</td></tr><tr><td><code>projects:write</code></td><td>Create or modify permitted project resources.</td></tr>
+<tr><td><code>data:read</code></td><td>Read project data records.</td></tr><tr><td><code>data:write</code></td><td>Create, update, or delete project data records.</td></tr>
+<tr><td><code>auth:read</code></td><td>Permitted application-authentication reads.</td></tr><tr><td><code>auth:write</code></td><td>Permitted application-authentication writes.</td></tr></tbody></table>
+<p class="docs-note">These are the scopes currently exposed by the portal. Do not assume they grant storage permissions. Storage-key authentication is separate; use the matching Core contract for its credential format and schema.</p></section>
+
+<section class="docs-section" id="projects"><p class="eyebrow">04 · DEVELOPER API</p><h2>Projects and data records</h2><h3>Account and project management</h3><div class="endpoint-list">
+<div><code>POST /register</code><span>Create a developer account.</span></div><div><code>POST /login</code><span>Start a developer session.</span></div><div><code>POST /logout</code><span>End the current developer session.</span></div><div><code>GET /me</code><span>Retrieve the current developer account.</span></div><div><code>GET /developer/projects</code><span>List projects.</span></div><div><code>POST /developer/projects</code><span>Create a project.</span></div><div><code>GET /keys</code><span>List project API keys.</span></div><div><code>POST /keys</code><span>Create a project API key.</span></div><div><code>DELETE /keys/{key_id}</code><span>Revoke an API key.</span></div></div>
+<h3>Email verification and recovery</h3><div class="endpoint-list">
+<div><code>POST /verify-email</code><span>Verify email using a Core-issued token.</span></div><div><code>POST /resend-verification</code><span>Request another verification email.</span></div><div><code>POST /forgot-password</code><span>Request recovery instructions.</span></div><div><code>POST /reset-password</code><span>Reset a password using the recovery token.</span></div></div>
+<h3>Project data collections</h3><div class="endpoint-list">
+<div><code>POST /projects/{project_id}/collections/{collection}/records</code><span>Create a record.</span></div><div><code>GET /projects/{project_id}/collections/{collection}/records</code><span>List records.</span></div><div><code>GET /projects/{project_id}/collections/{collection}/records/{record_id}</code><span>Retrieve one record.</span></div><div><code>PUT /projects/{project_id}/collections/{collection}/records/{record_id}</code><span>Update a record.</span></div><div><code>DELETE /projects/{project_id}/collections/{collection}/records/{record_id}</code><span>Delete a record.</span></div></div>
+<p class="docs-note">Paths are relative to <code>/api/v1</code>. This reference lists confirmed paths; it does not guess unverified request bodies, pagination parameters, or response schemas.</p></section>
+
+<section class="docs-section" id="storage"><p class="eyebrow">05 · DEVELOPER STORAGE</p><h2>Store files for your project</h2><p>Core includes project-scoped routes for object upload, listing, download, deletion, usage, and storage-key management.</p><div class="endpoint-list">
+<div><code>POST /projects/{project_id}/storage/subscriptions/checkout</code><span>Create a storage-plan checkout.</span></div><div><code>GET /projects/{project_id}/storage/keys</code><span>List project storage keys.</span></div><div><code>POST /projects/{project_id}/storage/keys</code><span>Create a storage key.</span></div><div><code>DELETE /projects/{project_id}/storage/keys/{key_id}</code><span>Revoke a storage key.</span></div><div><code>POST /projects/{project_id}/storage/objects</code><span>Upload an object; configured body limit is 10 MiB.</span></div><div><code>GET /projects/{project_id}/storage/objects</code><span>List project objects.</span></div><div><code>GET /projects/{project_id}/storage/objects/{object_id}</code><span>Download an object.</span></div><div><code>DELETE /projects/{project_id}/storage/objects/{object_id}</code><span>Delete an object.</span></div><div><code>GET /projects/{project_id}/storage/usage</code><span>Read project storage usage.</span></div></div>
+<h3>Payment and capacity safety</h3><ul><li>Checkout starts a payment flow; it does not itself grant capacity.</li><li>Capacity is granted only after Core independently verifies settlement.</li><li>A browser redirect or client-supplied payment status is not proof of payment.</li><li>Storage-key authentication is distinct from developer API-key authentication. Do not guess its header, body, or response format.</li></ul>
+<p class="docs-warning">Storage routes are present in deployed Core. Successful live upload/download, payment settlement, and renewal still require end-to-end verification before production reliance.</p></section>
+
+<section class="docs-section" id="plans"><p class="eyebrow">06 · STORAGE PRICING</p><h2>Monthly storage packages</h2><p>Monthly subscription prices in Sierra Leonean leones (SLE).</p><div class="storage-plan-grid">
+<article class="storage-plan"><h3>Starter</h3><p class="plan-capacity">5 GB</p><p class="plan-price">SLE 25 <span>/ month</span></p></article>
+<article class="storage-plan"><h3>Basic</h3><p class="plan-capacity">20 GB</p><p class="plan-price">SLE 100 <span>/ month</span></p></article>
+<article class="storage-plan"><h3>Growth</h3><p class="plan-capacity">50 GB</p><p class="plan-price">SLE 250 <span>/ month</span></p></article>
+<article class="storage-plan"><h3>Business</h3><p class="plan-capacity">100 GB</p><p class="plan-price">SLE 500 <span>/ month</span></p></article>
+<article class="storage-plan storage-plan-enterprise"><h3>Enterprise</h3><p class="plan-capacity">Custom capacity</p><p class="plan-price">Custom monthly pricing</p><p>Contact SEENRO to discuss requirements.</p></article></div>
+<p class="docs-note">These are the approved package prices. Internal checkout plan codes and complete checkout request/response schemas are intentionally not guessed.</p></section>
+
+<section class="docs-section" id="roadmap"><p class="eyebrow">07 · PRODUCT DIRECTION</p><h2>What we are building toward</h2><div class="roadmap-list">
+<article><span class="roadmap-state">Foundation in early access</span><h3>Developer API</h3><p>Developer identity, project management, scoped credentials, project data, and initial storage API.</p></article>
+<article><span class="roadmap-state">Planned</span><h3>Businesses API</h3><p>Business APIs and integrations with separate access controls, data ownership, and usage limits.</p></article>
+<article><span class="roadmap-state">Planned</span><h3>AI API</h3><p>AI capabilities and integrations for applications and business workflows.</p></article>
+<article><span class="roadmap-state">Planned</span><h3>Automation API</h3><p>Connected workflows and automation with isolated permissions and execution limits.</p></article>
+<article><span class="roadmap-state">Long-term architecture</span><h3>Data isolation and platform operations</h3><p>Progress toward PostgreSQL-backed project isolation, row-level security, mature backups, usage metering, and subscription operations. These are roadmap goals, not claims about the currently deployed SQLite foundation.</p></article></div>
+<p class="docs-note">SEENRO is an independent technology platform being developed from Sierra Leone. Planned services are not currently available APIs.</p></section>
+<section class="docs-section docs-help"><h2>Need integration help?</h2><p>Contact SEENRO before relying on an undocumented storage credential or payment workflow in production.</p><a class="primary-button" href="https://seenrotech.com/contact.html">Contact SEENRO →</a></section>
+</main><footer><a href="https://seenrotech.com/">SEENRO Technology</a><span>Independent technology initiative · Sierra Leone</span><span>© 2026 SEENRO Technology</span></footer>
+</body></html>

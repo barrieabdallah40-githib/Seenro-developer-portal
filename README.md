@@ -1,113 +1,104 @@
 # SEENRO Developer Portal
 
-A separate static frontend for the early-access SEENRO Core API.
-
-## Current integration
+Static developer portal for the early-access SEENRO Core API.
 
 - Portal: https://developers.seenrotech.com
 - API base URL: https://api.seenrotech.com/api/v1
 - Backend: SEENRO Core
+- Public documentation: `docs.html`
 
-## Current capabilities
+## Current portal capabilities
 
 - Developer registration, login, session management, and logout.
-- Email verification and resend-verification integration.
-- Forgot-password and password-reset integration.
+- Email verification and password recovery flows integrated with Core.
 - Creating and listing developer projects.
-- Creating, listing, and revoking project-bound API keys.
-- Selecting supported API permission scopes.
-- Copying a newly generated API-key secret when it is displayed.
+- Creating, listing, and revoking project-bound developer API keys.
+- Selecting supported project, data, and auth permission scopes.
+- One-time display of newly generated developer API-key secrets.
+- Public documentation for the Developer API and initial storage API.
 
 Email verification and password recovery require the matching Core backend
-feature and a correctly configured email provider. Their presence in this
-frontend branch does not mean production email delivery is already active.
+feature and a correctly configured email provider. Frontend integration does
+not prove production email delivery is active.
 
-## Getting started
+## Confirmed route surface
 
-1. Open the Developer API section.
-2. Register an account or sign in.
-3. Create a project or select an existing project.
-4. Generate a project-bound API key with only the permissions required.
-5. Copy and securely store the secret when it is displayed.
-
-An existing signed-in session should open the workspace rather than require
-registration again.
-
-## Supported API-key scopes
-
-| Scope | Permission |
-|---|---|
-| `projects:read` | Read permitted project information |
-| `projects:write` | Create or modify permitted project resources |
-| `data:read` | Read project data records |
-| `data:write` | Create, update, or delete project data records |
-| `auth:read` | Access permitted application-authentication read operations |
-| `auth:write` | Access permitted application-authentication write operations |
-
-Keys are bound to a project. Core checks project ownership and enforces
-the permissions assigned to each key.
-
-## API endpoints
-
-Developer account:
+Account and developer management:
 - `POST /register`
 - `POST /login`
 - `POST /logout`
 - `GET /me`
-
-Email verification and recovery:
 - `POST /verify-email`
 - `POST /resend-verification`
 - `POST /forgot-password`
 - `POST /reset-password`
-
-Projects and API keys:
 - `GET /developer/projects`
 - `POST /developer/projects`
 - `GET /keys`
 - `POST /keys`
 - `DELETE /keys/{key_id}`
 
-Project data records:
+Project data:
 - `POST /projects/{project_id}/collections/{collection}/records`
 - `GET /projects/{project_id}/collections/{collection}/records`
 - `GET /projects/{project_id}/collections/{collection}/records/{record_id}`
 - `PUT /projects/{project_id}/collections/{collection}/records/{record_id}`
 - `DELETE /projects/{project_id}/collections/{collection}/records/{record_id}`
 
-Project deletion is currently disabled by Core to protect project data.
+Initial project storage:
+- `POST /projects/{project_id}/storage/subscriptions/checkout`
+- `GET /projects/{project_id}/storage/keys`
+- `POST /projects/{project_id}/storage/keys`
+- `DELETE /projects/{project_id}/storage/keys/{key_id}`
+- `POST /projects/{project_id}/storage/objects`
+- `GET /projects/{project_id}/storage/objects`
+- `GET /projects/{project_id}/storage/objects/{object_id}`
+- `DELETE /projects/{project_id}/storage/objects/{object_id}`
+- `GET /projects/{project_id}/storage/usage`
 
-## API-key security
+The configured storage object upload request body limit is 10 MiB. The docs
+intentionally do not guess storage-key headers, payloads, response schemas, or
+internal checkout plan codes; confirm those against the Core implementation.
 
-- A newly created API-key secret is displayed only once.
-- Core stores a hash of the key, not its original secret.
-- Keep API-key secrets private.
-- Use project API keys only from your application's trusted backend.
-- Never embed secret keys in browser JavaScript, public repositories, or mobile application code.
-- Revoke a key if it is exposed or no longer needed.
-- Grant only the permissions an application requires.
+## Monthly storage packages
 
-The developer login session used to manage projects and keys is separate
-from project API-key authentication.
+Prices in SLE:
+| Package | Capacity | Monthly price |
+|---|---:|---:|
+| Starter | 5 GB | SLE 25 |
+| Basic | 20 GB | SLE 100 |
+| Growth | 50 GB | SLE 250 |
+| Business | 100 GB | SLE 500 |
+| Enterprise | Custom | Contact SEENRO |
 
-## Planned services
+Checkout creation does not grant capacity. Core must independently verify
+payment settlement before storage capacity is activated.
 
-The following are planned platform areas and are not advertised here as
-currently available APIs:
+## Security
 
-- Businesses API
-- AI API
-- Automation API
+- Developer API-key secrets are displayed only once and stored as hashes.
+- Keep developer API-key secrets private and use them only on trusted servers.
+- Never embed secret keys in browser JavaScript, public repositories, or mobile
+  application code.
+- Revoke exposed keys and grant only required permissions.
+- Developer sessions, project API keys, and storage keys are distinct
+  credential mechanisms. Do not assume developer key scopes authorize storage.
+
+## Availability and roadmap
+
+The deployed Core service, binary, and database initialization were verified.
+That is not proof of successful live email delivery, Monime settlement, object
+upload/download, or subscription renewal. The docs label these as provider-
+dependent or requiring end-to-end verification.
+
+Businesses API, AI API, and Automation API remain planned. PostgreSQL-backed
+project isolation, row-level security, mature backups, usage metering, and
+expanded subscription operations are longer-term goals. The deployed
+foundation currently uses SQLite; PostgreSQL/RLS is not represented as live.
 
 ## Deployment
 
-This repository contains a separate static frontend, maintained as a
-separate Vercel project for `developers.seenrotech.com`.
-
-The Core API is hosted separately at `api.seenrotech.com`.
-
-Changes to this repository do not automatically update production.
-Review, merge, and deployment are separate steps.
-
-Do not put backend credentials, production secrets, passwords, session
-tokens, or private API-key values in source files or commits.
+This static frontend is maintained separately for `developers.seenrotech.com`.
+The Core API is hosted separately at `api.seenrotech.com`. Review, merge, and
+deployment are separate steps. Never commit backend credentials, production
+secrets, passwords, session tokens, or private API-key values.

@@ -461,6 +461,82 @@
       const createdKeyPanel = element("div", {
         className: "portal-project-list"
       });
+
+      // Storage API keys are separate from Developer API keys.
+      const storageHeading = element("h3", {}, "Storage API keys");
+      const storageDescription = element(
+        "p",
+        {},
+        "Create project-bound credentials for file storage. Secrets are displayed only once."
+      );
+      const storageForm = element("form", {
+        className: "portal-form"
+      });
+      const storageNameField = field("Storage key name", "storageKeyName");
+      const storageProjectSelect = element("select", {
+        name: "storage_project_id",
+        required: "required"
+      });
+      storageProjectSelect.append(
+        element("option", { value: "" }, "Select a project")
+      );
+
+      const storageProjectField = element("label", {
+        className: "portal-field"
+      });
+      storageProjectField.append(
+        element("span", {}, "Project"),
+        storageProjectSelect
+      );
+
+      const storagePermissions = element("div", {
+        className: "portal-actions"
+      });
+
+      const storageReadLabel = element("label", {
+        className: "portal-field"
+      });
+      const storageRead = element("input", {
+        type: "checkbox",
+        name: "storage_can_read"
+      });
+      storageRead.checked = true;
+      storageReadLabel.append(
+        storageRead,
+        element("span", {}, "Read storage objects")
+      );
+
+      const storageWriteLabel = element("label", {
+        className: "portal-field"
+      });
+      const storageWrite = element("input", {
+        type: "checkbox",
+        name: "storage_can_write"
+      });
+      storageWriteLabel.append(
+        storageWrite,
+        element("span", {}, "Write storage objects")
+      );
+
+      storagePermissions.append(storageReadLabel, storageWriteLabel);
+
+      storageForm.append(
+        storageNameField,
+        storageProjectField,
+        storagePermissions,
+        element("button", {
+          type: "submit",
+          className: "primary-button"
+        }, "Generate storage key")
+      );
+
+      const storageCreatedPanel = element("div", {
+        className: "portal-project-list"
+      });
+      const storageKeyList = element("div", {
+        className: "portal-project-list"
+      });
+
       const keyForm = element("form", {
         className: "portal-form"
       });
@@ -518,6 +594,12 @@
       );
 
       const refreshKeys = button("Refresh API keys", loadKeys);
+      const refreshStorageKeys = button(
+        "Refresh storage keys",
+        loadStorageKeys,
+        "portal-secondary-button"
+      );
+
       const createForm = element("form", {
         className: "portal-form"
       });
@@ -620,6 +702,193 @@
         }
       });
 
+      storageForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const submit = storageForm.querySelector('button[type="submit"]');
+        const name = formField(storageForm, "storageKeyName");
+        const projectId = storageProjectSelect.value;
+        const canRead = storageRead.checked;
+        const canWrite = storageWrite.checked;
+
+        if (!projectId) {
+          showMessage("Select a project for this storage key.", true);
+          return;
+        }
+
+        if (!canRead && !canWrite) {
+          showMessage("Select at least one storage permission.", true);
+          return;
+        }
+
+        submit.disabled = true;
+        storageCreatedPanel.replaceChildren();
+        showMessage("Generating storage key…");
+
+        try {
+          const result = await api(
+            `/projects/${encodeURIComponent(projectId)}/storage/keys`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                name,
+                can_read: canRead,
+                can_write: canWrite
+              })
+            }
+          );
+
+          if (
+            typeof result.secret !== "string" ||
+            !result.secret ||
+            result.id === undefined
+          ) {
+            throw new Error(
+              "The server response did not contain the expected one-time secret. Check the storage key list before trying again."
+            );
+          }
+
+          const secretInput = element("input", {
+            type: "text",
+            readOnly: "readonly",
+            autocomplete: "off",
+            spellcheck: "false",
+            "aria-label": "One-time storage API key secret"
+          });
+          secretInput.value = result.secret;
+
+          const secretPanel = element("article", {
+            className: "portal-project"
+          });
+
+          secretPanel.append(
+            element("strong", {}, "Your new storage key"),
+            element("p", {}, result.warning ||
+              "This secret is shown only once. Store it securely."),
+            element("span", {}, `Name: ${result.name || name}`),
+            element("span", {}, `Prefix: ${result.prefix || "Unavailable"}`),
+            secretInput
+          );
+
+          const copyStorageKey = button(
+            "Copy storage key",
+            async () => {
+              try {
+                await navigator.clipboard.writeText(secretInput.value);
+                showMessage("Storage key copied. Keep it private.");
+              } catch {
+                secretInput.focus();
+                secretInput.select();
+                showMessage("Select and copy the storage key manually.");
+              }
+            }
+          );
+
+          const dismissSecret = button(
+            "Hide secret",
+            () => {
+              secretInput.value = "";
+              storageCreatedPanel.replaceChildren();
+              showMessage("Secret hidden. It cannot be retrieved again.");
+            },
+            "portal-secondary-button"
+          );
+
+          secretPanel.append(copyStorageKey, dismissSecret);
+          storageCreatedPanel.replaceChildren(secretPanel);
+
+          storageForm.reset();
+          storageRead.checked = true;
+          storageWrite.checked = false;
+
+          showMessage("Storage key created. Copy and store the secret now.");
+          await loadStorageKeys();
+        } catch (error) {
+          handleWorkspaceError(error);
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      async function loadStorageKeys() {
+        const projectId = storageProjectSelect.value;
+
+        if (!projectId) {
+          storageKeyList.replaceChildren(
+            element("p", {}, "Select a project to view its storage keys.")
+          );
+          return;
+        }
+
+        storageKeyList.replaceChildren(
+          element("p", {}, "Loading storage keys…")
+        );
+
+        try {
+          const result = await api(
+            `/projects/${encodeURIComponent(projectId)}/storage/keys`
+          );
+
+          const keys = Array.isArray(result.keys) ? result.keys : [];
+          storageKeyList.replaceChildren();
+
+          if (keys.length === 0) {
+            storageKeyList.append(
+              element("p", {}, "No storage API keys for this project yet.")
+            );
+            return;
+          }
+
+          for (const key of keys) {
+            const row = element("article", {
+              className: "portal-project"
+            });
+
+            row.append(
+              element("strong", {}, key.name || "Unnamed storage key"),
+              element("span", {}, `Prefix: ${key.prefix || "Unavailable"}`),
+              element("span", {}, `Read: ${key.can_read ? "Enabled" : "Disabled"}`),
+              element("span", {}, `Write: ${key.can_write ? "Enabled" : "Disabled"}`),
+              element("span", {}, `Created: ${key.created_at || "Unknown"}`),
+              element("span", {}, key.revoked_at
+                ? `Revoked: ${key.revoked_at}`
+                : "Status: Active")
+            );
+
+            if (!key.revoked_at) {
+              row.append(button("Revoke storage key", async () => {
+                if (!window.confirm(
+                  `Revoke storage key "${key.name}"? This cannot be undone.`
+                )) {
+                  return;
+                }
+
+                try {
+                  await api(
+                    `/projects/${encodeURIComponent(projectId)}/storage/keys/${encodeURIComponent(key.id)}`,
+                    { method: "DELETE" }
+                  );
+                  showMessage("Storage key revoked.");
+                  await loadStorageKeys();
+                } catch (error) {
+                  handleWorkspaceError(error);
+                }
+              }, "portal-danger"));
+            }
+
+            storageKeyList.append(row);
+          }
+        } catch (error) {
+          storageKeyList.replaceChildren();
+          handleWorkspaceError(error);
+        }
+      }
+
+      storageProjectSelect.addEventListener("change", () => {
+        storageCreatedPanel.replaceChildren();
+        loadStorageKeys();
+      });
+
       async function loadKeys() {
         keyList.replaceChildren(element("p", {}, "Loading API keys…"));
 
@@ -694,14 +963,26 @@
           projectSelect.replaceChildren(
             element("option", { value: "" }, "Select a project")
           );
+          storageProjectSelect.replaceChildren(
+            element("option", { value: "" }, "Select a project")
+          );
 
           for (const project of projects) {
-            projectSelect.append(
-              element(
-                "option",
-                { value: String(project.id) },
-                project.name
-              )
+            const option = () => element(
+              "option",
+              { value: String(project.id) },
+              project.name
+            );
+
+            projectSelect.append(option());
+            storageProjectSelect.append(option());
+          }
+
+          if (storageProjectSelect.value) {
+            await loadStorageKeys();
+          } else {
+            storageKeyList.replaceChildren(
+              element("p", {}, "Select a project to view its storage keys.")
             );
           }
 
@@ -739,6 +1020,12 @@
         createdKeyPanel,
         refreshKeys,
         keyList,
+        storageHeading,
+        storageDescription,
+        storageForm,
+        storageCreatedPanel,
+        refreshStorageKeys,
+        storageKeyList,
         element("h3", {}, "Project list"),
         refresh,
         projectList,

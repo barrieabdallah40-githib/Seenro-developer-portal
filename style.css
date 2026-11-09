@@ -426,3 +426,37 @@ footer a { color: var(--text); text-decoration: none; }
 .docs-section a.primary-button {
   color: #07150f;
 }
+
+
+/* SEENRO company navigation integration */
+.top-nav .back-link[href^="https://seenrotech.com"] {
+  color: var(--accent);
+  font-weight: 700;
+}
+.docs-main a, footer a { text-underline-offset: 3px; }
+@media (max-width: 600px) {
+  .topbar { gap: 12px; align-items: flex-start; }
+  .top-nav { row-gap: 8px; }
+}
+
+
+/* Developer Storage console */
+.storage-security-note {
+  padding: 14px 16px;
+  border: 1px solid #80634a;
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--panel);
+  line-height: 1.6;
+}
+.portal-project-list > span {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 5px 0;
+}
+.portal-project-list .portal-project {
+  gap: 8px;
+}
+.portal-field input[type="file"] {
+  max-width: 100%;
+}

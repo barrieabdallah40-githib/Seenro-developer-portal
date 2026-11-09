@@ -537,6 +537,153 @@
         className: "portal-project-list"
       });
 
+      const storageUsageHeading = element("h4", {}, "Storage usage");
+      const storageUsagePanel = element("div", {
+        className: "portal-project-list"
+      });
+      storageUsagePanel.append(
+        element("p", {}, "Select a project to view its storage capacity and usage.")
+      );
+
+      const storageSubscriptionHeading = element("h4", {}, "Storage subscriptions");
+      const storagePlanSelect = element("select", {
+        name: "storage_plan",
+        required: "required"
+      });
+
+      storagePlanSelect.append(
+        element("option", { value: "starter" }, "Starter — 5 GB — SLE 25 / 30 days"),
+        element("option", { value: "basic" }, "Basic — 20 GB — SLE 100 / 30 days"),
+        element("option", { value: "growth" }, "Growth — 50 GB — SLE 250 / 30 days"),
+        element("option", { value: "business" }, "Business — 100 GB — SLE 500 / 30 days")
+      );
+
+      const storagePlanField = element("label", {
+        className: "portal-field"
+      });
+      storagePlanField.append(
+        element("span", {}, "Choose a monthly storage plan"),
+        storagePlanSelect
+      );
+
+      const storageCheckoutStatus = element("p", {});
+      const storageCheckoutButton = button(
+        "Continue to Monime",
+        startStorageCheckout
+      );
+
+      async function startStorageCheckout() {
+        const projectId = storageProjectSelect.value;
+        const planCode = storagePlanSelect.value;
+
+        if (!projectId) {
+          showMessage("Select a project before purchasing storage.", true);
+          return;
+        }
+
+        if (!["starter", "basic", "growth", "business"].includes(planCode)) {
+          showMessage("Select a valid storage plan.", true);
+          return;
+        }
+
+        storageCheckoutButton.disabled = true;
+        storageCheckoutStatus.textContent = "Creating secure checkout…";
+
+        try {
+          const result = await api(
+            `/projects/${encodeURIComponent(projectId)}/storage/subscriptions/checkout`,
+            {
+              method: "POST",
+              body: JSON.stringify({ plan_code: planCode })
+            }
+          );
+
+          const checkoutUrl = new URL(result.checkout_url);
+
+          if (
+            checkoutUrl.protocol !== "https:" ||
+            checkoutUrl.hostname !== "checkout.monime.io" ||
+            checkoutUrl.username ||
+            checkoutUrl.password ||
+            checkoutUrl.port
+          ) {
+            throw new Error("Monime returned an untrusted checkout URL.");
+          }
+
+          storageCheckoutStatus.textContent =
+            "Checkout created. Redirecting to Monime…";
+
+          window.location.assign(checkoutUrl.href);
+        } catch (error) {
+          storageCheckoutStatus.textContent =
+            error.message || "Could not create checkout.";
+
+          showMessage(
+            error.message || "Could not create storage checkout.",
+            true
+          );
+
+          storageCheckoutButton.disabled = false;
+          handleWorkspaceError(error);
+        }
+      }
+
+      const objectManagerHeading = element("h4", {}, "Storage object manager");
+      const objectManagerDescription = element(
+        "p",
+        {},
+        "Developer testing tool. Enter a Storage API key with the required permissions. The key stays in this page's memory and is not saved."
+      );
+
+      const storageSecretField = element("label", {
+        className: "portal-field"
+      });
+      storageSecretField.append(
+        element("span", {}, "Storage API key (st_live_)"),
+        element("input", {
+          type: "password",
+          name: "storage_test_secret",
+          autocomplete: "new-password",
+          spellcheck: "false",
+          placeholder: "Paste a Storage API key"
+        })
+      );
+      const storageSecretInput = storageSecretField.querySelector("input");
+
+      const storageFileField = element("label", {
+        className: "portal-field"
+      });
+      storageFileField.append(
+        element("span", {}, "Choose an image, video or other file"),
+        element("input", {
+          type: "file",
+          name: "storage_upload_file"
+        })
+      );
+      const storageFileInput = storageFileField.querySelector("input");
+
+      const uploadStorageButton = button(
+        "Upload file",
+        uploadStorageObject
+      );
+      const refreshObjectsButton = button(
+        "Refresh objects",
+        loadStorageObjects,
+        "portal-secondary-button"
+      );
+      const storageObjectList = element("div", {
+        className: "portal-project-list"
+      });
+      storageObjectList.append(
+        element("p", {}, "Enter a Storage API key to list this project's objects.")
+      );
+
+      const customerUploadWarning = element("p", {
+        className: "storage-security-note"
+      },
+        "Production integration warning: never put a st_live_ key in browser JavaScript, a mobile app, or code delivered to customers. Customer uploads require a trusted developer server to authorize each upload. This dashboard tool is for developer testing only."
+      );
+
       const keyForm = element("form", {
         className: "portal-form"
       });
@@ -619,6 +766,7 @@
         } catch {
           // Clear the local session even if the server logout request fails.
         }
+        storageSecretInput.value = "";
         session.clear();
         window.location.replace("login.html");
       });
@@ -884,9 +1032,289 @@
         }
       }
 
+      function formatStorageBytes(value) {
+        const bytes = Number(value);
+        if (!Number.isFinite(bytes) || bytes < 0) return "Unavailable";
+        if (bytes < 1024) return `${bytes} B`;
+        const units = ["KB", "MB", "GB", "TB"];
+        let amount = bytes / 1024;
+        let unit = 0;
+        while (amount >= 1024 && unit < units.length - 1) {
+          amount /= 1024;
+          unit += 1;
+        }
+        return `${amount.toFixed(2)} ${units[unit]}`;
+      }
+
+      async function loadStorageUsage() {
+        const projectId = storageProjectSelect.value;
+        if (!projectId) {
+          storageUsagePanel.replaceChildren(
+            element("p", {}, "Select a project to view storage usage.")
+          );
+          return;
+        }
+
+        storageUsagePanel.replaceChildren(
+          element("p", {}, "Loading storage usage…")
+        );
+
+        try {
+          const usage = await api(
+            `/projects/${encodeURIComponent(projectId)}/storage/usage`
+          );
+
+          storageUsagePanel.replaceChildren(
+            element("span", {}, `Total project capacity: ${formatStorageBytes(usage.total_capacity_bytes)}`),
+            element("span", {}, `Used: ${formatStorageBytes(usage.used_bytes)}`),
+            element("span", {}, `Available: ${formatStorageBytes(usage.available_bytes)}`),
+            element("span", {}, `Account-wide free capacity: ${formatStorageBytes(usage.free_capacity_bytes)}`),
+            element("span", {}, `Project paid capacity: ${formatStorageBytes(usage.project_paid_capacity_bytes)}`),
+            element("span", {}, `Monthly capacity: ${formatStorageBytes(usage.monthly_capacity_bytes)}`),
+            element("p", {}, "Usage may include objects pending deletion.")
+          );
+        } catch (error) {
+          storageUsagePanel.replaceChildren(
+            element("p", {}, error.message || "Could not load storage usage.")
+          );
+          handleWorkspaceError(error);
+        }
+      }
+
+      function storageObjectUrl(projectId, objectId) {
+        return `${API_BASE}/projects/${encodeURIComponent(projectId)}/storage/objects/${encodeURIComponent(objectId)}`;
+      }
+
+      async function storageObjectRequest(url, options = {}) {
+        const secret = storageSecretInput.value.trim();
+        if (!secret || !secret.startsWith("st_live_")) {
+          throw new Error("Enter a valid-looking st_live_ Storage API key first.");
+        }
+
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${secret}`,
+            ...(options.headers || {})
+          }
+        });
+
+        const responseText = await response.text();
+        let data = null;
+        if (responseText) {
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            data = null;
+          }
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || data?.message || `Storage request failed (${response.status}).`
+          );
+        }
+
+        return { response, data };
+      }
+
+      async function loadStorageObjects() {
+        const projectId = storageProjectSelect.value;
+        if (!projectId) {
+          storageObjectList.replaceChildren(
+            element("p", {}, "Select a project first.")
+          );
+          return;
+        }
+
+        if (!storageSecretInput.value.trim()) {
+          storageObjectList.replaceChildren(
+            element("p", {}, "Enter a Storage API key with read permission to list objects.")
+          );
+          return;
+        }
+
+        storageObjectList.replaceChildren(
+          element("p", {}, "Loading storage objects…")
+        );
+
+        try {
+          const result = await storageObjectRequest(
+            `${API_BASE}/projects/${encodeURIComponent(projectId)}/storage/objects`
+          );
+          const objects = Array.isArray(result.data?.objects)
+            ? result.data.objects
+            : [];
+
+          storageObjectList.replaceChildren();
+
+          if (objects.length === 0) {
+            storageObjectList.append(
+              element("p", {}, "No stored objects were returned for this project.")
+            );
+            return;
+          }
+
+          for (const object of objects) {
+            const row = element("article", {
+              className: "portal-project"
+            });
+
+            row.append(
+              element("strong", {}, object.filename || object.object_id || "Unnamed object"),
+              element("span", {}, `Object ID: ${object.object_id}`),
+              element("span", {}, `Type: ${object.content_type || "Unknown"}`),
+              element("span", {}, `Size: ${formatStorageBytes(object.size_bytes)}`),
+              element("span", {}, `Created: ${object.created_at || "Unknown"}`)
+            );
+
+            row.append(
+              button("Download", async () => {
+                try {
+                  const secret = storageSecretInput.value.trim();
+                  if (!secret) throw new Error("Enter the Storage API key again.");
+
+                  const response = await fetch(
+                    storageObjectUrl(projectId, object.object_id),
+                    {
+                      headers: { Authorization: `Bearer ${secret}` }
+                    }
+                  );
+
+                  if (!response.ok) {
+                    let message = `Download failed (${response.status}).`;
+                    try {
+                      const body = await response.json();
+                      message = body.error || body.message || message;
+                    } catch {}
+                    throw new Error(message);
+                  }
+
+                  const blob = await response.blob();
+                  const objectUrl = URL.createObjectURL(blob);
+                  const link = element("a", {
+                    href: objectUrl,
+                    download: object.filename || "seenro-download"
+                  });
+                  document.body.append(link);
+                  link.click();
+                  link.remove();
+                  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+                } catch (error) {
+                  showMessage(error.message, true);
+                }
+              }, "portal-secondary-button"),
+              button("Delete", async () => {
+                if (!window.confirm(
+                  `Permanently delete "${object.filename || object.object_id}"?`
+                )) return;
+
+                try {
+                  await storageObjectRequest(
+                    storageObjectUrl(projectId, object.object_id),
+                    { method: "DELETE" }
+                  );
+                  showMessage("Storage object deleted.");
+                  await loadStorageObjects();
+                  await loadStorageUsage();
+                } catch (error) {
+                  showMessage(error.message, true);
+                }
+              }, "portal-danger")
+            );
+
+            storageObjectList.append(row);
+          }
+        } catch (error) {
+          storageObjectList.replaceChildren(
+            element("p", {}, error.message || "Could not load storage objects.")
+          );
+          showMessage(error.message, true);
+        }
+      }
+
+      async function uploadStorageObject() {
+        const projectId = storageProjectSelect.value;
+        const secret = storageSecretInput.value.trim();
+        const file = storageFileInput.files?.[0];
+
+        if (!projectId) {
+          showMessage("Select a project before uploading.", true);
+          return;
+        }
+        if (!secret || !secret.startsWith("st_live_")) {
+          showMessage("Enter a Storage API key with write permission.", true);
+          return;
+        }
+        if (!file) {
+          showMessage("Choose a file to upload.", true);
+          return;
+        }
+
+        uploadStorageButton.disabled = true;
+        showMessage("Uploading file…");
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/projects/${encodeURIComponent(projectId)}/storage/objects`,
+            {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                Authorization: `Bearer ${secret}`,
+                "X-Filename": file.name,
+                "Content-Type": file.type || "application/octet-stream"
+              },
+              body: file
+            }
+          );
+
+          const responseText = await response.text();
+          let result = null;
+          if (responseText) {
+            try {
+              result = JSON.parse(responseText);
+            } catch {
+              result = null;
+            }
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              result?.error || result?.message ||
+              `Upload failed (${response.status}).`
+            );
+          }
+
+          storageFileInput.value = "";
+          showMessage(
+            `Upload complete. ${result?.filename || file.name} (${formatStorageBytes(result?.size_bytes ?? file.size)}).`
+          );
+          await loadStorageObjects();
+          await loadStorageUsage();
+        } catch (error) {
+          showMessage(error.message || "Upload failed.", true);
+        } finally {
+          uploadStorageButton.disabled = false;
+        }
+      }
+
       storageProjectSelect.addEventListener("change", () => {
         storageCreatedPanel.replaceChildren();
+        storageSecretInput.value = "";
+        storageFileInput.value = "";
+        storageObjectList.replaceChildren(
+          element("p", {}, "Enter a Storage API key to list this project's objects.")
+        );
         loadStorageKeys();
+        loadStorageUsage();
+      });
+
+      storageSecretInput.addEventListener("input", () => {
+        storageObjectList.replaceChildren(
+          element("p", {}, "Storage key entered. Refresh objects to load the project's files.")
+        );
       });
 
       async function loadKeys() {
@@ -1026,6 +1454,20 @@
         storageCreatedPanel,
         refreshStorageKeys,
         storageKeyList,
+        storageSubscriptionHeading,
+        storagePlanField,
+        storageCheckoutButton,
+        storageCheckoutStatus,
+        storageUsageHeading,
+        storageUsagePanel,
+        objectManagerHeading,
+        objectManagerDescription,
+        customerUploadWarning,
+        storageSecretField,
+        storageFileField,
+        uploadStorageButton,
+        refreshObjectsButton,
+        storageObjectList,
         element("h3", {}, "Project list"),
         refresh,
         projectList,

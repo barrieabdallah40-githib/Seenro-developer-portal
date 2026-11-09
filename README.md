@@ -56,9 +56,15 @@ Initial project storage:
 - `DELETE /projects/{project_id}/storage/objects/{object_id}`
 - `GET /projects/{project_id}/storage/usage`
 
-The configured storage object upload request body limit is 10 MiB. The docs
-intentionally do not guess storage-key headers, payloads, response schemas, or
-internal checkout plan codes; confirm those against the Core implementation.
+Storage allocation and upload limits:
+- Free allocation: 100 MiB per developer account, shared across its projects.
+- Purchased capacity: allocated to the individual project.
+- Monthly subscription capacity: allocated to the individual project.
+- Non-video files: maximum 100 MiB per file.
+- MP4 videos: maximum 250 MB per file and 5 minutes duration.
+- Original uploaded bytes are preserved without forced compression.
+
+Core validates uploads and independently verifies payment before granting paid capacity. A browser redirect is not proof of payment.
 
 ## Monthly storage packages
 

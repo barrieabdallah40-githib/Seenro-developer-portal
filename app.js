@@ -97,7 +97,8 @@
       return;
     }
 
-    if (!["login", "register", "dashboard"].includes(page)) return;
+    const workspacePages = ["dashboard", "projects", "storage", "api-keys", "storage-keys", "account"];
+    if (!["login", "register", ...workspacePages].includes(page)) return;
 
     const main = document.querySelector("main");
     if (!main) return;
@@ -111,14 +112,21 @@
       element(
         "p",
         { className: "eyebrow" },
-        page === "dashboard" ? "DEVELOPER WORKSPACE" : "DEVELOPER ACCOUNT"
+        workspacePages.includes(page) ? "DEVELOPER WORKSPACE" : "DEVELOPER ACCOUNT"
       ),
       element(
         "h2",
         {},
-        page === "dashboard"
-          ? "Your developer workspace"
-          : page === "register" ? "Create your account" : "Welcome back"
+        ({
+          dashboard: "Workspace",
+          projects: "Projects",
+          storage: "Storage",
+          "api-keys": "Developer API keys",
+          "storage-keys": "Storage API keys",
+          account: "Account",
+          register: "Create your account",
+          login: "Welcome back"
+        })[page] || "Developer workspace"
       )
     );
 
@@ -454,6 +462,24 @@
         className: "portal-project-list"
       });
 
+      const usageProjectSelect = element("select", {
+        name: "usage_project_id",
+        "aria-label": "Project storage usage"
+      });
+      usageProjectSelect.append(
+        element("option", { value: "" }, "Select a project")
+      );
+      const usageProjectField = element("label", {
+        className: "portal-field"
+      });
+      usageProjectField.append(
+        element("span", {}, "Storage usage for project"),
+        usageProjectSelect
+      );
+      const usagePanel = element("div", {
+        className: "portal-usage-grid"
+      });
+
       const keyHeading = element("h3", {}, "API keys");
       const keyList = element("div", {
         className: "portal-project-list"
@@ -522,7 +548,6 @@
 
       storageForm.append(
         storageNameField,
-        storageProjectField,
         storagePermissions,
         element("button", {
           type: "submit",
@@ -548,7 +573,7 @@
       const storageFilesHeading = element("h3", {}, "Storage files");
       const storageFilesDescription = element(
         "p", {},
-        "Connect a read-enabled storage key to browse files. Upload and delete require write permission. Keys are never saved in browser storage."
+        "Connect a project storage key to manage files. Read permission allows browsing and downloads; write permission allows uploads and deletion. Free storage is 100 MiB shared across your projects. Purchased and monthly subscription capacity belongs to the selected project. Non-video files: maximum 100 MiB. MP4 videos: maximum 250 MB and 5 minutes. Original uploaded bytes are preserved. Keys stay in page memory only."
       );
 
       const storageKeyConnectForm = element("form", {
@@ -593,7 +618,7 @@
         required: "required"
       });
       storageFileLabel.append(
-        element("span", {}, "Choose a file (maximum 100 MiB)"),
+        element("span", {}, "Choose a file (non-video: 100 MiB; MP4: 250 MB and 5 minutes)"),
         storageFileInput
       );
       storageUploadForm.append(
@@ -944,9 +969,119 @@
         const value = Number(bytes);
         if (!Number.isFinite(value) || value < 0) return "Unknown size";
         if (value < 1024) return `${value} B`;
-        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-        return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+
+        const units = ["KB", "MB", "GB", "TB"];
+        let size = value / 1024;
+        let unit = 0;
+
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit++;
+        }
+
+        return `${size.toFixed(2)} ${units[unit]}`;
       }
+
+      let usageRequestId = 0;
+
+      async function loadStorageUsage() {
+        const projectId = usageProjectSelect.value;
+        const requestId = ++usageRequestId;
+
+        if (!projectId) {
+          usagePanel.replaceChildren(
+            element("p", {}, "Select a project to view storage usage.")
+          );
+          return;
+        }
+
+        usagePanel.replaceChildren(
+          element("p", {}, "Loading verified storage usage…")
+        );
+
+        try {
+          const usage = await api(
+            `/projects/${encodeURIComponent(projectId)}/storage/usage`
+          );
+
+          if (
+            usageProjectSelect.value !== projectId ||
+            usageRequestId !== requestId
+          ) return;
+
+          const card = (label, value, detail) => {
+            const item = element("article", {
+              className: "portal-usage-card"
+            });
+            item.append(
+              element("span", { className: "portal-usage-label" }, label),
+              element("strong", { className: "portal-usage-value" }, value),
+              element("span", { className: "portal-usage-detail" }, detail)
+            );
+            return item;
+          };
+
+          const freeUsed = Number(usage.account_free_used_bytes);
+          const freeCapacity = Number(usage.account_free_capacity_bytes);
+          const paidUsed = Number(usage.project_paid_used_bytes);
+          const paidCapacity = Number(usage.project_paid_capacity_bytes);
+          const totalUsed = Number(usage.project_used_bytes);
+          const available = Number(usage.available_bytes);
+
+          const valid = (...values) =>
+            values.every(value => Number.isFinite(value) && value >= 0);
+
+          if (!valid(freeUsed, freeCapacity, paidUsed, paidCapacity, totalUsed, available)) {
+            throw new Error("The storage usage response contains invalid values.");
+          }
+
+          usagePanel.replaceChildren(
+            card(
+              "Account-wide free storage",
+              `${formatStorageSize(freeUsed)} / ${formatStorageSize(freeCapacity)}`,
+              `${formatStorageSize(Math.max(0, freeCapacity - freeUsed))} free remaining across your projects`
+            ),
+            card(
+              "Selected project paid storage",
+              paidCapacity > 0
+                ? `${formatStorageSize(paidUsed)} / ${formatStorageSize(paidCapacity)}`
+                : formatStorageSize(paidUsed),
+              paidCapacity > 0
+                ? `${formatStorageSize(Math.max(0, paidCapacity - paidUsed))} paid capacity remaining`
+                : "No paid capacity"
+            ),
+            card(
+              "Selected project total used",
+              formatStorageSize(totalUsed),
+              "Total project object usage"
+            ),
+            card(
+              "Combined available storage",
+              formatStorageSize(available),
+              "Remaining account free and project paid capacity"
+            ),
+            element(
+              "p",
+              { className: "portal-usage-note" },
+              usage.usage_includes_pending_deletion === true
+                ? "Usage figures include objects pending deletion."
+                : "Usage figures reflect the storage usage reported by SEENRO Core."
+            )
+          );
+        } catch (error) {
+          if (
+            usageProjectSelect.value === projectId &&
+            usageRequestId === requestId
+          ) {
+            usagePanel.replaceChildren(
+              element("p", {}, error.message || "Unable to load storage usage.")
+            );
+            handleWorkspaceError(error);
+          }
+        }
+      }
+
+      usageProjectSelect.addEventListener("change", loadStorageUsage);
 
       function handleStorageError(error, expectedSecret = storageSecret) {
         if (error.status === 401 && storageSecret === expectedSecret) {
@@ -1351,8 +1486,16 @@
           showMessage("Choose a file to upload.", true);
           return;
         }
-        if (file.size > 100 * 1024 * 1024) {
-          showMessage("This file exceeds the 100 MiB upload limit.", true);
+        const isMp4 = file.type.toLowerCase() === "video/mp4" ||
+          file.name.toLowerCase().endsWith(".mp4");
+
+        if (isMp4 && file.size > 250_000_000) {
+          showMessage("This MP4 exceeds the 250 MB file-size limit.", true);
+          return;
+        }
+
+        if (!isMp4 && file.size > 100 * 1024 * 1024) {
+          showMessage("This non-video file exceeds the 100 MiB file-size limit.", true);
           return;
         }
         if (
@@ -1591,6 +1734,9 @@
           storageProjectSelect.replaceChildren(
             element("option", { value: "" }, "Select a project")
           );
+          usageProjectSelect.replaceChildren(
+            element("option", { value: "" }, "Select a project")
+          );
 
           for (const project of projects) {
             const option = () => element(
@@ -1601,6 +1747,15 @@
 
             projectSelect.append(option());
             storageProjectSelect.append(option());
+            usageProjectSelect.append(option());
+          }
+
+          if (usageProjectSelect.value) {
+            await loadStorageUsage();
+          } else {
+            usagePanel.replaceChildren(
+              element("p", {}, "Create a project to start viewing storage usage.")
+            );
           }
 
           if (storageProjectSelect.value) {
@@ -1637,33 +1792,59 @@
         }
       }
 
-      panel.append(
-        heading,
-        createForm,
-        keyHeading,
-        keyForm,
-        createdKeyPanel,
-        refreshKeys,
-        keyList,
-        storageHeading,
-        storageDescription,
-        storageForm,
-        storageCreatedPanel,
-        refreshStorageKeys,
-        storageKeyList,
-        storageFilesHeading,
-        storageFilesDescription,
-        storageKeyConnectForm,
-        storageConnectionStatus,
-        storageDisconnectButton,
-        storageUploadForm,
-        storageRefreshButton,
-        storageObjectList,
-        element("h3", {}, "Project list"),
-        refresh,
-        projectList,
-        signOut
-      );
+      if (page === "dashboard") {
+        panel.append(
+          usageProjectField,
+          usagePanel,
+          heading,
+          refresh,
+          projectList
+        );
+      } else if (page === "projects") {
+        panel.append(
+          heading,
+          createForm,
+          refresh,
+          projectList
+        );
+      } else if (page === "api-keys") {
+        panel.append(
+          keyHeading,
+          keyForm,
+          createdKeyPanel,
+          refreshKeys,
+          keyList
+        );
+      } else if (page === "storage-keys") {
+        panel.append(
+          storageHeading,
+          storageDescription,
+          storageProjectField,
+          storageForm,
+          storageCreatedPanel,
+          refreshStorageKeys,
+          storageKeyList
+        );
+      } else if (page === "storage") {
+        panel.append(
+          storageHeading,
+          storageDescription,
+          storageProjectField,
+          storageFilesHeading,
+          storageFilesDescription,
+          storageKeyConnectForm,
+          storageConnectionStatus,
+          storageDisconnectButton,
+          storageUploadForm,
+          storageRefreshButton,
+          storageObjectList
+        );
+      } else if (page === "account") {
+        panel.append(
+          element("p", {}, "Manage your signed-in developer session."),
+          signOut
+        );
+      }
 
       await loadProjects();
       await loadKeys();
@@ -1672,7 +1853,7 @@
     handleEmailLink().then((handled) => {
       if (handled) return;
 
-      if (page === "dashboard") {
+      if (workspacePages.includes(page)) {
         if (!session.get()) {
           window.location.replace("login.html");
           return;
@@ -1693,7 +1874,7 @@
       renderAuth(page);
     }).catch((error) => {
       session.clear();
-      if (page === "dashboard") {
+      if (workspacePages.includes(page)) {
         window.location.replace("login.html");
         return;
       }

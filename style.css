@@ -458,3 +458,145 @@ footer a { color: var(--text); text-decoration: none; }
   opacity: .6;
   cursor: wait;
 }
+
+
+/* SEENRO compact multi-page workspace */
+body[data-page="dashboard"],
+body[data-page="projects"],
+body[data-page="storage"],
+body[data-page="api-keys"],
+body[data-page="storage-keys"],
+body[data-page="account"] {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.portal-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: flex-end;
+}
+
+.portal-page-nav a {
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.portal-page-nav a:hover,
+.portal-page-nav a:focus-visible {
+  color: var(--accent);
+}
+
+.portal-console {
+  max-width: 1080px;
+  padding-top: 28px;
+  padding-bottom: 48px;
+}
+
+.portal-console h2 {
+  margin: 8px 0 18px;
+  font-size: clamp(1.45rem, 3vw, 1.9rem);
+  letter-spacing: -.025em;
+}
+
+.portal-panel {
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.portal-panel h3 {
+  margin: 12px 0 2px;
+  font-size: 1.05rem;
+}
+
+.portal-panel h4 {
+  font-size: .95rem;
+}
+
+.portal-form {
+  max-width: 100%;
+  padding: 16px;
+  gap: 12px;
+}
+
+.portal-field {
+  gap: 5px;
+  font-size: .83rem;
+}
+
+.portal-field input,
+.portal-field select,
+.portal-field textarea {
+  font-size: .88rem;
+}
+
+.portal-panel button,
+.portal-form button {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: .82rem;
+}
+
+.portal-project {
+  gap: 10px;
+  padding: 12px;
+  font-size: .84rem;
+}
+
+.portal-project strong {
+  font-size: .9rem;
+}
+
+.portal-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portal-usage-card {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.portal-usage-label,
+.portal-usage-detail {
+  color: var(--muted);
+  font-size: .77rem;
+}
+
+.portal-usage-value {
+  overflow-wrap: anywhere;
+  font-size: 1.12rem;
+}
+
+.portal-usage-note {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 5%;
+  }
+
+  .portal-page-nav {
+    justify-content: flex-start;
+    gap: 10px 14px;
+  }
+
+  .portal-usage-grid {
+    grid-template-columns: 1fr;
+  }
+}

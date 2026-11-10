@@ -568,7 +568,7 @@
 
       const storageCheckoutStatus = element("p", {});
       const storageCheckoutButton = button(
-        "Continue to Monime",
+        "Pay with Monime",
         startStorageCheckout
       );
 

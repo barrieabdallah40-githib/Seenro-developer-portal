@@ -46,10 +46,29 @@
 <div><code>POST /projects/{project_id}/collections/{collection}/records</code><span>Create a record.</span></div><div><code>GET /projects/{project_id}/collections/{collection}/records</code><span>List records.</span></div><div><code>GET /projects/{project_id}/collections/{collection}/records/{record_id}</code><span>Retrieve one record.</span></div><div><code>PUT /projects/{project_id}/collections/{collection}/records/{record_id}</code><span>Update a record.</span></div><div><code>DELETE /projects/{project_id}/collections/{collection}/records/{record_id}</code><span>Delete a record.</span></div></div>
 <p class="docs-note">Paths are relative to <code>/api/v1</code>. This reference lists confirmed paths; it does not guess unverified request bodies, pagination parameters, or response schemas.</p></section>
 
-<section class="docs-section" id="storage"><p class="eyebrow">05 · DEVELOPER STORAGE</p><h2>Store files for your project</h2><p>Core includes project-scoped routes for object upload, listing, download, deletion, usage, storage-key management, and subscription checkout. Each developer account receives 100 MiB of free storage shared across its projects. Purchased and active monthly subscription capacity belongs to the individual project. Non-video files support up to 100 MiB per file; MP4 videos support up to 250 MB and 5 minutes. Core validates video uploads and preserves original uploaded bytes without forced compression.</p><div class="endpoint-list">
-<div><code>POST /projects/{project_id}/storage/subscriptions/checkout</code><span>Create a storage-plan checkout.</span></div><div><code>GET /projects/{project_id}/storage/keys</code><span>List project storage keys.</span></div><div><code>POST /projects/{project_id}/storage/keys</code><span>Create a storage key.</span></div><div><code>DELETE /projects/{project_id}/storage/keys/{key_id}</code><span>Revoke a storage key.</span></div><div><code>POST /projects/{project_id}/storage/objects</code><span>Upload an object; non-video files up to 100 MiB, MP4 videos up to 250 MB and 5 minutes.</span></div><div><code>GET /projects/{project_id}/storage/objects</code><span>List project objects.</span></div><div><code>GET /projects/{project_id}/storage/objects/{object_id}</code><span>Download an object.</span></div><div><code>DELETE /projects/{project_id}/storage/objects/{object_id}</code><span>Delete an object.</span></div><div><code>GET /projects/{project_id}/storage/usage</code><span>Read project storage usage.</span></div></div>
-<h3>Payment and capacity safety</h3><ul><li>Checkout starts a payment flow; it does not itself grant capacity.</li><li>Capacity is granted only after Core independently verifies settlement.</li><li>A browser redirect or client-supplied payment status is not proof of payment.</li><li>Storage-key authentication is distinct from developer API-key authentication. Do not guess its header, body, or response format.</li></ul>
-<p class="docs-warning">Storage routes are present in deployed Core. Successful live upload/download, payment settlement, and renewal still require end-to-end verification before production reliance.</p></section>
+<section class="docs-section" id="storage">
+<p class="eyebrow">05 · DEVELOPER STORAGE</p>
+<h2>Store files for your project</h2>
+<p>SEENRO Storage provides project-scoped file storage, Storage API key management, usage tracking, and subscription checkout. Developers integrate Storage into their own applications through a trusted server-side environment. Create and manage project Storage API keys in this portal, then keep each secret key in your server's environment variables or secret manager. Never expose an <code>st_live_</code> key in browser JavaScript, a mobile application, a public repository, or code delivered to customers.</p>
+<p>Your application backend uses its Storage API key for authorized server-side Storage operations. For customer uploads, the intended integration is for your trusted backend to authorize the upload. Customers should not need a SEENRO developer account or a Storage API key. SEENRO manages the storage backend, object handling, project capacity, usage, and applicable subscription enforcement.</p>
+<p>The developer portal manages Storage keys, subscriptions, checkout, and usage. It is not intended to be a browser-based object upload, download, or deletion console.</p>
+<p>Product limits: non-video files up to 100 MiB; MP4, MOV, and WebM videos up to 250 MB and 5 minutes. Video size and duration limits are independent. Original uploaded bytes are preserved without forced compression.</p>
+<div class="endpoint-list">
+<div><code>POST /projects/{project_id}/storage/subscriptions/checkout</code><span>Create a storage-plan checkout.</span></div>
+<div><code>GET /projects/{project_id}/storage/keys</code><span>List project Storage API keys.</span></div>
+<div><code>POST /projects/{project_id}/storage/keys</code><span>Create a project Storage API key.</span></div>
+<div><code>DELETE /projects/{project_id}/storage/keys/{key_id}</code><span>Revoke a project Storage API key.</span></div>
+<div><code>GET /projects/{project_id}/storage/usage</code><span>Read project storage usage.</span></div>
+</div>
+<h3>Payment and capacity safety</h3>
+<ul>
+<li>Checkout starts a payment flow; it does not itself grant capacity.</li>
+<li>Capacity is granted only after Core independently verifies settlement.</li>
+<li>A browser redirect or client-supplied payment status is not proof of payment.</li>
+<li>Storage API keys are separate from developer API keys. Keep Storage secrets server-side.</li>
+</ul>
+<p class="docs-warning">The portal's key management, subscription, and usage features do not by themselves verify the complete customer-upload integration. Verify server-side authorization, upload restrictions, object access, payment settlement, and renewal end to end before relying on the complete flow in production.</p>
+</section>
 
 <section class="docs-section" id="plans"><p class="eyebrow">06 · STORAGE PRICING</p><h2>Monthly storage packages</h2><p>Monthly subscription prices in Sierra Leonean leones (SLE).</p><div class="storage-plan-grid">
 <article class="storage-plan"><h3>Starter</h3><p class="plan-capacity">5 GB</p><p class="plan-price">SLE 25 <span>/ month</span></p></article>

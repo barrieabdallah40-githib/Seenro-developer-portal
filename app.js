@@ -480,6 +480,36 @@
         className: "portal-usage-grid"
       });
 
+      // Storage subscription checkout is created and verified by SEENRO Core.
+      const storagePlanSelect = element("select", {
+        name: "storage_plan",
+        required: "required"
+      });
+      storagePlanSelect.append(
+        element("option", { value: "starter" }, "Starter — 5 GB — SLE 25 / month"),
+        element("option", { value: "basic" }, "Basic — 20 GB — SLE 100 / month"),
+        element("option", { value: "growth" }, "Growth — 50 GB — SLE 250 / month"),
+        element("option", { value: "business" }, "Business — 100 GB — SLE 500 / month")
+      );
+
+      const storagePlanField = element("label", {
+        className: "portal-field"
+      });
+      storagePlanField.append(
+        element("span", {}, "Choose a monthly storage plan"),
+        storagePlanSelect
+      );
+
+      const storageCheckoutStatus = element("p", {
+        role: "status",
+        "aria-live": "polite"
+      }, "Choose a project and storage plan to continue.");
+
+      const storageCheckoutButton = element("button", {
+        type: "button",
+        className: "primary-button"
+      }, "Pay with Monime");
+
       const keyHeading = element("h3", {}, "API keys");
       const keyList = element("div", {
         className: "portal-project-list"
@@ -1082,6 +1112,66 @@
       }
 
       usageProjectSelect.addEventListener("change", loadStorageUsage);
+
+      async function startStorageCheckout() {
+        const projectId = usageProjectSelect.value;
+        const planCode = storagePlanSelect.value;
+
+        if (!projectId) {
+          storageCheckoutStatus.textContent =
+            "Select a project before purchasing storage.";
+          return;
+        }
+
+        if (!["starter", "basic", "growth", "business"].includes(planCode)) {
+          storageCheckoutStatus.textContent = "Select a valid storage plan.";
+          return;
+        }
+
+        storageCheckoutButton.disabled = true;
+        storageCheckoutStatus.textContent = "Creating secure checkout…";
+
+        try {
+          const result = await api(
+            `/projects/${encodeURIComponent(projectId)}/storage/subscriptions/checkout`,
+            {
+              method: "POST",
+              body: JSON.stringify({ plan_code: planCode })
+            }
+          );
+
+          if (typeof result.checkout_url !== "string") {
+            throw new Error("SEENRO Core did not return a checkout URL.");
+          }
+
+          const checkoutUrl = new URL(result.checkout_url);
+
+          if (
+            checkoutUrl.protocol !== "https:" ||
+            checkoutUrl.hostname !== "checkout.monime.io" ||
+            checkoutUrl.username ||
+            checkoutUrl.password ||
+            checkoutUrl.port
+          ) {
+            throw new Error("Monime returned an untrusted checkout URL.");
+          }
+
+          storageCheckoutStatus.textContent =
+            "Checkout created. Redirecting to Monime…";
+
+          window.location.assign(checkoutUrl.href);
+        } catch (error) {
+          storageCheckoutStatus.textContent =
+            error.message || "Could not create storage checkout.";
+          storageCheckoutButton.disabled = false;
+          handleWorkspaceError(error);
+        }
+      }
+
+      storageCheckoutButton.addEventListener(
+        "click",
+        startStorageCheckout
+      );
 
       function handleStorageError(error, expectedSecret = storageSecret) {
         if (error.status === 401 && storageSecret === expectedSecret) {
@@ -1829,6 +1919,10 @@
         panel.append(
           storageHeading,
           storageDescription,
+          usageProjectField,
+          storagePlanField,
+          storageCheckoutButton,
+          storageCheckoutStatus,
           storageProjectField,
           storageFilesHeading,
           storageFilesDescription,

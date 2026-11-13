@@ -574,7 +574,22 @@
         element("span", {}, "Write storage objects")
       );
 
-      storagePermissions.append(storageReadLabel, storageWriteLabel);
+      const storageUploadLabel = element("label", {
+        className: "portal-field"
+      });
+      const storageCanIssueUploads = element("input", {
+        type: "checkbox",
+        name: "storage_can_issue_uploads"
+      });
+      storageUploadLabel.append(
+        storageCanIssueUploads,
+        element("span", {}, "Issue customer upload authorizations")
+      );
+      storagePermissions.append(
+        storageReadLabel,
+        storageWriteLabel,
+        storageUploadLabel
+      );
 
       storageForm.append(
         storageNameField,
@@ -765,13 +780,14 @@
         const projectId = storageProjectSelect.value;
         const canRead = storageRead.checked;
         const canWrite = storageWrite.checked;
+        const canIssueUploads = storageCanIssueUploads.checked;
 
         if (!projectId) {
           showMessage("Select a project for this storage key.", true);
           return;
         }
 
-        if (!canRead && !canWrite) {
+        if (!canRead && !canWrite && !canIssueUploads) {
           showMessage("Select at least one storage permission.", true);
           return;
         }
@@ -788,7 +804,8 @@
               body: JSON.stringify({
                 name,
                 can_read: canRead,
-                can_write: canWrite
+                can_write: canWrite,
+                can_issue_uploads: canIssueUploads
               })
             }
           );
@@ -1083,6 +1100,7 @@
               element("span", {}, `Prefix: ${key.prefix || "Unavailable"}`),
               element("span", {}, `Read: ${key.can_read ? "Enabled" : "Disabled"}`),
               element("span", {}, `Write: ${key.can_write ? "Enabled" : "Disabled"}`),
+              element("span", {}, `Issue uploads: ${key.can_issue_uploads ? "Enabled" : "Disabled"}`),
               element("span", {}, `Created: ${key.created_at || "Unknown"}`),
               element("span", {}, key.revoked_at
                 ? `Revoked: ${key.revoked_at}`

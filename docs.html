@@ -48,26 +48,74 @@
 
 <section class="docs-section" id="storage">
 <p class="eyebrow">05 · DEVELOPER STORAGE</p>
-<h2>Store files for your project</h2>
-<p>SEENRO Storage provides project-scoped file storage, Storage API key management, usage tracking, and subscription checkout. Developers integrate Storage into their own applications through a trusted server-side environment. Create and manage project Storage API keys in this portal, then keep each secret key in your server's environment variables or secret manager. Never expose an <code>st_live_</code> key in browser JavaScript, a mobile application, a public repository, or code delivered to customers.</p>
-<p>Your application backend uses its Storage API key for authorized server-side Storage operations. For customer uploads, the intended integration is for your trusted backend to authorize the upload. Customers should not need a SEENRO developer account or a Storage API key. SEENRO manages the storage backend, object handling, project capacity, usage, and applicable subscription enforcement.</p>
-<p>The developer portal manages Storage keys, subscriptions, checkout, and usage. It is not intended to be a browser-based object upload, download, or deletion console.</p>
-<p>Product limits: non-video files up to 100 MiB; MP4, MOV, and WebM videos up to 250 MB and 5 minutes. Video size and duration limits are independent. Original uploaded bytes are preserved without forced compression.</p>
+<h2>Store and serve customer media</h2>
+<p>SEENRO Storage provides project-scoped object storage, customer uploads, media viewing and sharing, Storage API key management, usage tracking, and subscription checkout. Developers integrate Storage into their own applications and websites. Their customers do not need SEENRO developer accounts or Storage API credentials.</p>
+<p><strong>Keep Storage secrets on your backend.</strong> A secret <code>st_live_</code> key must never appear in browser JavaScript, a mobile application, a public repository, or code delivered to customers. Your trusted server uses it for authorized Storage operations. Customers upload using a short-lived, single-use upload token instead.</p>
+
+<h3>Storage key permissions</h3>
+<ul>
+<li><strong>Read (<code>can_read</code>):</strong> permits Storage-key read operations.</li>
+<li><strong>Write (<code>can_write</code>):</strong> permits Storage-key write and administration operations, including customer linking, group management, group membership management, and public-page configuration.</li>
+<li><strong>Issue uploads (<code>can_issue_uploads</code>):</strong> permits the backend to issue temporary customer upload authorizations.</li>
+</ul>
+<p>For the customer upload and private-viewing integration, the backend needs <code>can_write</code> to link customers and <code>can_issue_uploads</code> to issue upload tokens. A key can have multiple capabilities. Use least privilege.</p>
+
+<h3>Customer upload and private viewing</h3>
+<p>Use the same stable external customer ID for linking and upload authorization. The identity link associates a Storage customer with a SEENRO application user in the same project. Uploading alone does not create this application-user association.</p>
+<ol class="docs-steps">
+<li><strong>Authenticate your customer.</strong> Your backend first authenticates the customer with SEENRO Application Auth. Register with POST /api/v1/projects/{project_id}/auth/register or log in with POST /api/v1/projects/{project_id}/auth/login, using a project-bound API key with auth:write. Both endpoints return user.id and access_token. Use user.id as application_user_id when linking the customer, and keep access_token as the customer's Bearer session credential. Never expose the project API key or Storage developer secret to the customer-facing app.</li>
+<li><strong>Link the customer from your trusted backend.</strong> Call the customer-link endpoint with a Storage key having <code>can_write</code>. Supply the stable external customer ID and corresponding project-scoped SEENRO <code>application_user_id</code>.</li>
+<li><strong>Issue an upload authorization.</strong> Your backend calls the upload-authorization endpoint using a key with <code>can_issue_uploads</code> and the exact same external customer ID.</li>
+<li><strong>Upload from the customer's app.</strong> The app sends the file using the temporary token as its Bearer credential. It never receives the developer's <code>st_live_</code> key.</li>
+<li><strong>View private media.</strong> The app requests the private media endpoint using the customer's valid SEENRO application-user session. Core checks ownership or an applicable active share.</li>
+</ol>
+<p class="docs-note">Link the customer before relying on private viewing. The external customer ID must match exactly between linking and upload authorization, and the linked application user must be the user whose valid session is used to view the media. Upload can succeed without this link, but private ownership access will not automatically infer the relationship.</p>
+
+<h3>Storage and customer-media endpoints</h3>
+<p>Paths are relative to <code>/api/v1</code>. Use the project ID belonging to the Storage key or customer session.</p>
 <div class="endpoint-list">
-<div><code>POST /projects/{project_id}/storage/subscriptions/checkout</code><span>Create a storage-plan checkout.</span></div>
-<div><code>GET /projects/{project_id}/storage/keys</code><span>List project Storage API keys.</span></div>
-<div><code>POST /projects/{project_id}/storage/keys</code><span>Create a project Storage API key.</span></div>
-<div><code>DELETE /projects/{project_id}/storage/keys/{key_id}</code><span>Revoke a project Storage API key.</span></div>
-<div><code>GET /projects/{project_id}/storage/usage</code><span>Read project storage usage.</span></div>
+<div><code>POST /projects/{project_id}/storage/customers/link</code><span>Link an external customer identity to a project application user. Trusted backend; <code>can_write</code>.</span></div>
+<div><code>POST /projects/{project_id}/storage/uploads</code><span>Issue a short-lived, single-use customer upload authorization. Trusted backend; <code>can_issue_uploads</code>.</span></div>
+<div><code>PUT /storage/uploads</code><span>Upload using the temporary token as Bearer authorization. No developer Storage key is sent by the customer.</span></div>
+<div><code>GET /projects/{project_id}/storage/media/{object_id}</code><span>Private media viewing using the customer's application-user session. Ownership or an applicable active share is required.</span></div>
+<div><code>POST /projects/{project_id}/storage/groups</code><span>Create or update a sharing group. Trusted backend; <code>can_write</code>.</span></div>
+<div><code>POST /projects/{project_id}/storage/groups/{group_key}/members</code><span>Manage group membership. Trusted backend; <code>can_write</code>.</span></div>
+<div><code>POST /projects/{project_id}/storage/pages</code><span>Configure a public-facing sharing page. Trusted backend; <code>can_write</code>.</span></div>
+<div><code>POST /projects/{project_id}/storage/shares</code><span>Create a customer-owned share using the authenticated application-user session and ownership checks.</span></div>
+<div><code>POST /projects/{project_id}/storage/shares/revoke</code><span>Revoke a share using the authenticated application-user session; Core checks ownership.</span></div>
+<div><code>GET /storage/shared/{token}</code><span>View an active unlisted share using its share token.</span></div>
+<div><code>GET /storage/public/{project_id}/{page_key}/{object_id}</code><span>View media made available through an enabled public page and valid public-page share.</span></div>
+<div><code>GET /projects/{project_id}/storage/keys</code><span>List project Storage keys and capabilities.</span></div>
+<div><code>POST /projects/{project_id}/storage/keys</code><span>Create a project Storage key.</span></div>
+<div><code>DELETE /projects/{project_id}/storage/keys/{key_id}</code><span>Revoke a project Storage key.</span></div>
+<div><code>GET /projects/{project_id}/storage/objects</code><span>List project Storage objects.</span></div>
+<div><code>POST /projects/{project_id}/storage/objects</code><span>Create a Storage object through the developer Storage API.</span></div>
+<div><code>GET /projects/{project_id}/storage/objects/{object_id}</code><span>Retrieve a Storage object through the developer Storage API.</span></div>
+<div><code>DELETE /projects/{project_id}/storage/objects/{object_id}</code><span>Delete a Storage object through the developer Storage API.</span></div>
+<div><code>GET /projects/{project_id}/storage/usage</code><span>Read project Storage usage.</span></div>
+<div><code>POST /projects/{project_id}/storage/subscriptions/checkout</code><span>Create a Storage-plan checkout.</span></div>
 </div>
+
+<h3>Customer sharing and access boundaries</h3>
+<ul>
+<li>Media is private by default. Private viewing uses the authenticated application-user session and Core's ownership/share checks.</li>
+<li>Customer-to-customer share creation and revocation are authenticated customer operations, not developer Storage-key permissions.</li>
+<li>Developers manage customer links, groups, group members, and public-page configuration through trusted backend calls authorized by <code>can_write</code>.</li>
+<li>Group and customer shares are checked for membership or recipient, revocation, and expiry.</li>
+<li>Unlisted and public-page access are distinct sharing modes. A public-facing page does not mean every object is permanently public or that private storage buckets are exposed.</li>
+<li>Sharing is scoped and revocable. Do not treat a share token as a permanent public object URL.</li>
+</ul>
+
+<h3>Upload limits and file handling</h3>
+<p>Current documented product limits are non-video files up to 100 MiB and MP4, MOV, and WebM videos up to 250 MB and 5 minutes. Video size and duration limits are independent. Original uploaded bytes are preserved without forced compression.</p>
+
 <h3>Payment and capacity safety</h3>
 <ul>
 <li>Checkout starts a payment flow; it does not itself grant capacity.</li>
 <li>Capacity is granted only after Core independently verifies settlement.</li>
 <li>A browser redirect or client-supplied payment status is not proof of payment.</li>
-<li>Storage API keys are separate from developer API keys. Keep Storage secrets server-side.</li>
 </ul>
-<p class="docs-warning">The portal's key management, subscription, and usage features do not by themselves verify the complete customer-upload integration. Verify server-side authorization, upload restrictions, object access, payment settlement, and renewal end to end before relying on the complete flow in production.</p>
+<p class="docs-warning">These routes and authorization boundaries reflect the inspected Core implementation. Developers should still test their complete application integration, including identity mapping, upload expiry/failure handling, private viewing, sharing expiry/revocation, capacity, payment settlement, and renewal.</p>
 </section>
 
 <section class="docs-section" id="plans"><p class="eyebrow">06 · STORAGE PRICING</p><h2>Monthly storage packages</h2><p>Monthly subscription prices in Sierra Leonean leones (SLE).</p><div class="storage-plan-grid">

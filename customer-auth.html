@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Authentication | SEENRO Developers</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .auth-docs{max-width:1050px;margin:36px auto;padding:0 20px 60px}
+    .auth-docs section{margin:28px 0;padding:22px;border:1px solid var(--border-color,#ddd);border-radius:12px}
+    .auth-docs h1,.auth-docs h2{margin-top:0}
+    .auth-docs pre{overflow-x:auto;padding:16px;border-radius:8px;background:#111;color:#eee}
+    .auth-docs code{overflow-wrap:anywhere}
+    .auth-docs .status{display:inline-block;padding:5px 10px;border-radius:20px;background:#e8f5e9;color:#176b32;font-size:.85rem}
+    .auth-docs .notice{padding:14px;border-left:4px solid #d69b24;background:rgba(214,155,36,.1);border-radius:6px}
+    .auth-docs table{width:100%;border-collapse:collapse}
+    .auth-docs th,.auth-docs td{padding:10px;text-align:left;border-bottom:1px solid var(--border-color,#ddd)}
+  </style>
+</head>
+<body>
+  <main class="auth-docs">
+    <p><a href="dashboard.html">← Developer dashboard</a></p>
+    <span class="status">Available in Core release 13fdd57</span>
+    <h1>Customer Authentication</h1>
+    <p>Build customer registration, login and session-based authentication into applications and websites using SEENRO Core.</p>
+
+    <section>
+      <h2>What it provides</h2>
+      <ul>
+        <li>Customer registration using a phone number and password.</li>
+        <li>Customer login using a phone number and password.</li>
+        <li>Optional email address during registration.</li>
+        <li>Project-scoped customer identities and sessions.</li>
+        <li>Authenticated customer profile retrieval and logout.</li>
+        <li>Allowed-origin configuration for browser applications.</li>
+      </ul>
+      <p><strong>Important:</strong> Customer Authentication is separate from your SEENRO developer account authentication and separate from SEENRO Storage.</p>
+    </section>
+
+    <section>
+      <h2>API configuration</h2>
+      <p><strong>API base URL</strong></p>
+      <pre><code>https://api.seenrotech.com/api/v1</code></pre>
+      <p>Use your project's public ID, which begins with <code>proj_pub_</code>. Customer-facing applications must not contain secret developer API keys.</p>
+    </section>
+
+    <section>
+      <h2>Register a customer</h2>
+      <pre><code>const response = await fetch(
+  "https://api.seenrotech.com/api/v1/public/projects/PROJECT_PUBLIC_ID/auth/register",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      phone_number: "+232XXXXXXXX",
+      password: "A-strong-customer-password",
+      email: "customer@example.com"
+    })
+  }
+);
+
+const result = await response.json();</code></pre>
+      <p>Email is optional. Do not make email mandatory in your registration form. Use the exact request fields and response format documented by the deployed API.</p>
+    </section>
+
+    <section>
+      <h2>Log in a customer</h2>
+      <pre><code>const response = await fetch(
+  "https://api.seenrotech.com/api/v1/public/projects/PROJECT_PUBLIC_ID/auth/login",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      phone_number: "+232XXXXXXXX",
+      password: "A-strong-customer-password"
+    })
+  }
+);
+
+const result = await response.json();</code></pre>
+      <p>Customer login uses phone number and password. Email is not a login credential.</p>
+    </section>
+
+    <section>
+      <h2>Get the current customer</h2>
+      <pre><code>const response = await fetch(
+  "https://api.seenrotech.com/api/v1/public/projects/PROJECT_PUBLIC_ID/auth/me",
+  {
+    headers: {
+      "Authorization": `Bearer ${customerSessionToken}`
+    }
+  }
+);
+
+const customer = await response.json();</code></pre>
+    </section>
+
+    <section>
+      <h2>Log out</h2>
+      <pre><code>const response = await fetch(
+  "https://api.seenrotech.com/api/v1/public/projects/PROJECT_PUBLIC_ID/auth/logout",
+  {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${customerSessionToken}`
+    }
+  }
+);</code></pre>
+    </section>
+
+    <section>
+      <h2>API routes</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Route</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>POST</td><td><code>/public/projects/{public_project_id}/auth/register</code></td><td>Register customer</td></tr>
+          <tr><td>POST</td><td><code>/public/projects/{public_project_id}/auth/login</code></td><td>Log in customer</td></tr>
+          <tr><td>GET</td><td><code>/public/projects/{public_project_id}/auth/me</code></td><td>Get authenticated customer</td></tr>
+          <tr><td>POST</td><td><code>/public/projects/{public_project_id}/auth/logout</code></td><td>End customer session</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Phone verification status</h2>
+      <p>Customer phone verification is not yet available in this release. New customer accounts are not proof of phone ownership; the phone verification field defaults to unverified. SMS/OTP delivery and phone-based recovery are not included in this v1 release.</p>
+      <p>Do not display a verified-phone status or rely on phone ownership as a security guarantee until a verification flow is implemented.</p>
+    </section>
+
+    <section>
+      <h2>Customer Auth usage and credits</h2>
+      <ul>
+        <li>Each project receives 100 free Customer Auth units once.</li>
+        <li>After the free allocation, the proposed unit price is SLE 0.25 per unit.</li>
+        <li>One unit represents one unique customer active in one project on one UTC calendar day.</li>
+        <li>Multiple logins or sessions by the same customer in the same project on the same UTC day count as one unit.</li>
+        <li>The same customer active on another UTC day can consume another unit.</li>
+      </ul>
+      <p class="notice"><strong>Metering status:</strong> The release includes the Customer Auth credit and purchase foundation. DAU metering and usage enforcement are not yet enabled. Do not treat the DAU calculation as currently enforced billing.</p>
+      <p>Customer Auth credits are separate from Storage credits and Storage subscriptions. Billing is intended to use SEENRO's existing billing and Monime integration, not a separate billing system.</p>
+    </section>
+
+    <section>
+      <h2>Security requirements</h2>
+      <ul>
+        <li>Keep customer data and sessions within the correct project.</li>
+        <li>Use the project's public ID in browser and mobile applications.</li>
+        <li>Never expose <code>sk_live_</code> developer secret keys in client-side code.</li>
+        <li>Never expose <code>st_live_</code> Storage keys in client-side code.</li>
+        <li>Use HTTPS and protect customer session tokens.</li>
+        <li>Configure allowed origins for browser applications. CORS is not an authentication or authorization boundary.</li>
+        <li>Do not confuse developer account credentials with customer account credentials.</li>
+      </ul>
+    </section>
+
+    <p><a href="dashboard.html">Back to dashboard</a> · <a href="projects.html">Projects</a> · <a href="storage.html">Storage</a></p>
+  </main>
+</body>
+</html>

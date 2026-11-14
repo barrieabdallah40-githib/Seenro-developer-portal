@@ -36,7 +36,17 @@
 <tr><td><code>projects:read</code></td><td>Read permitted project information.</td></tr><tr><td><code>projects:write</code></td><td>Create or modify permitted project resources.</td></tr>
 <tr><td><code>data:read</code></td><td>Read project data records.</td></tr><tr><td><code>data:write</code></td><td>Create, update, or delete project data records.</td></tr>
 <tr><td><code>auth:read</code></td><td>Permitted application-authentication reads.</td></tr><tr><td><code>auth:write</code></td><td>Permitted application-authentication writes.</td></tr></tbody></table>
-<p class="docs-note">These are the scopes currently exposed by the portal. Do not assume they grant storage permissions. Storage-key authentication is separate; use the matching Core contract for its credential format and schema.</p></section>
+<p class="docs-note">These are the scopes currently exposed by the portal. Do not assume they grant storage permissions. Storage-key authentication is separate; use the matching Core contract for its credential format and schema.</p>
+<h3>Public customer authentication (browser and mobile apps)</h3>
+<p>Use the public project ID shown in the project card (<code>proj_pub_...</code>) to select the project. It identifies the project; it is not a developer secret or a customer access token. These public routes do not require a developer API key:</p>
+<ul>
+<li><code>POST /api/v1/public/projects/{public_project_id}/auth/register</code> — JSON: <code>phone_number</code>, <code>password</code>, and optional <code>email</code>.</li>
+<li><code>POST /api/v1/public/projects/{public_project_id}/auth/login</code> — JSON: <code>phone_number</code> and <code>password</code>.</li>
+<li><code>GET /api/v1/public/projects/{public_project_id}/auth/me</code> — send the customer session as <code>Authorization: Bearer {access_token}</code>.</li>
+<li><code>POST /api/v1/public/projects/{public_project_id}/auth/logout</code> — send the customer session as a Bearer token.</li>
+</ul>
+<p>Registration currently reports <code>phone_verified: false</code>; successful registration must not be treated as proof of phone ownership. Never expose developer API keys (<code>sk_live_...</code>) or Storage secrets in browser or mobile apps.</p>
+</section>
 
 <section class="docs-section" id="projects"><p class="eyebrow">04 · DEVELOPER API</p><h2>Projects and data records</h2><h3>Account and project management</h3><div class="endpoint-list">
 <div><code>POST /register</code><span>Create a developer account.</span></div><div><code>POST /login</code><span>Start a developer session.</span></div><div><code>POST /logout</code><span>End the current developer session.</span></div><div><code>GET /me</code><span>Retrieve the current developer account.</span></div><div><code>GET /developer/projects</code><span>List projects.</span></div><div><code>POST /developer/projects</code><span>Create a project.</span></div><div><code>GET /keys</code><span>List project API keys.</span></div><div><code>POST /keys</code><span>Create a project API key.</span></div><div><code>DELETE /keys/{key_id}</code><span>Revoke an API key.</span></div></div>
@@ -63,7 +73,7 @@
 <h3>Customer upload and private viewing</h3>
 <p>Use the same stable external customer ID for linking and upload authorization. The identity link associates a Storage customer with a SEENRO application user in the same project. Uploading alone does not create this application-user association.</p>
 <ol class="docs-steps">
-<li><strong>Authenticate your customer.</strong> Your backend first authenticates the customer with SEENRO Application Auth. Register with POST /api/v1/projects/{project_id}/auth/register or log in with POST /api/v1/projects/{project_id}/auth/login, using a project-bound API key with auth:write. Both endpoints return user.id and access_token. Use user.id as application_user_id when linking the customer, and keep access_token as the customer's Bearer session credential. Never expose the project API key or Storage developer secret to the customer-facing app.</li>
+<li><strong>Authenticate your customer.</strong> A browser or mobile app can register or log in directly through the public routes documented above, using the project's <code>proj_pub_...</code> public ID. These routes return the customer <code>user.id</code> and <code>access_token</code>; use the user ID as <code>application_user_id</code> when linking the customer, and keep the access token as the customer's Bearer session credential. Alternatively, a trusted backend may use the protected <code>POST /api/v1/projects/{project_id}/auth/register</code> and <code>/login</code> routes with a project-bound developer key and <code>auth:write</code>. Never expose a developer API key or Storage secret to the customer-facing app.</li>
 <li><strong>Link the customer from your trusted backend.</strong> Call the customer-link endpoint with a Storage key having <code>can_write</code>. Supply the stable external customer ID and corresponding project-scoped SEENRO <code>application_user_id</code>.</li>
 <li><strong>Issue an upload authorization.</strong> Your backend calls the upload-authorization endpoint using a key with <code>can_issue_uploads</code> and the exact same external customer ID.</li>
 <li><strong>Upload from the customer's app.</strong> The app sends the file using the temporary token as its Bearer credential. It never receives the developer's <code>st_live_</code> key.</li>

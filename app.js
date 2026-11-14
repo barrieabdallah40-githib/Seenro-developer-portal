@@ -1261,11 +1261,30 @@
             const row = element("article", {
               className: "portal-project"
             });
+            const publicId = typeof project.public_id === "string"
+              ? project.public_id
+              : "";
 
             row.append(
               element("strong", {}, project.name),
-              element("span", {}, `Project ID: ${project.id}`)
+              element("span", {}, `Project ID: ${project.id}`),
+              element("span", {}, "Public project ID"),
+              element("code", {}, publicId || "Not returned by Core")
             );
+
+            if (publicId) {
+              row.append(button("Copy public project ID", async () => {
+                try {
+                  await navigator.clipboard.writeText(publicId);
+                  showMessage("Public project ID copied.");
+                } catch {
+                  showMessage(
+                    "Clipboard access unavailable. Select and copy the public project ID.",
+                    true
+                  );
+                }
+              }));
+            }
 
             projectList.append(row);
           }

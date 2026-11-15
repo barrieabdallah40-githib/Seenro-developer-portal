@@ -462,6 +462,198 @@
         className: "portal-project-list"
       });
 
+      // Project-scoped customer authentication origin management.
+      const authOriginsProjectSelect = element("select", {
+        name: "auth_origins_project_id",
+        "aria-label": "Project for customer authentication origins"
+      });
+      const authOriginsTextarea = element("textarea", {
+        name: "auth_origins",
+        rows: "6",
+        maxlength: "2550",
+        placeholder: "https://example.com\nhttps://app.example.com"
+      });
+      authOriginsTextarea.disabled = true;
+
+      const authOriginsFeedback = element("p", {
+        role: "status",
+        "aria-live": "polite"
+      });
+
+      const authOriginsSave = button("Save allowed origins", async () => {
+        const projectId = authOriginsProjectSelect.value;
+        const requestId = authOriginsRequest;
+
+        if (!projectId || authOriginsLoadedProjectId !== projectId) {
+          authOriginsFeedback.textContent =
+            "Load the selected project's origins before saving.";
+          return;
+        }
+
+        const origins = authOriginsTextarea.value
+          .split(/\r?\n/)
+          .map((origin) => origin.trim())
+          .filter(Boolean);
+
+        if (origins.length > 10) {
+          authOriginsFeedback.textContent =
+            "A maximum of 10 allowed origins is permitted.";
+          return;
+        }
+
+        if (
+          origins.length === 0 &&
+          !window.confirm(
+            "You are about to remove every allowed website origin. Browsers will block cross-origin requests from websites until an origin is added again. This does not restrict non-browser or server-to-server requests. Continue?"
+          )
+        ) {
+          return;
+        }
+
+        authOriginsSave.disabled = true;
+        authOriginsTextarea.disabled = true;
+        authOriginsFeedback.textContent = "Saving allowed origins…";
+
+        try {
+          const result = await api(
+            `/developer/projects/${encodeURIComponent(projectId)}/auth/origins`,
+            {
+              method: "PUT",
+              body: JSON.stringify({ origins })
+            }
+          );
+
+          // Ignore stale responses after the user switches projects.
+          if (
+            requestId !== authOriginsRequest ||
+            projectId !== authOriginsProjectSelect.value ||
+            authOriginsLoadedProjectId !== projectId
+          ) {
+            return;
+          }
+
+          authOriginsTextarea.value = Array.isArray(result.origins)
+            ? result.origins.join("\n")
+            : origins.join("\n");
+
+          authOriginsFeedback.textContent =
+            "Allowed origins saved successfully.";
+          showMessage("Customer authentication origins updated.");
+        } catch (error) {
+          if (
+            requestId === authOriginsRequest &&
+            projectId === authOriginsProjectSelect.value &&
+            authOriginsLoadedProjectId === projectId
+          ) {
+            authOriginsFeedback.textContent = error.message;
+          }
+          if (error.status === 401) {
+            handleWorkspaceError(error);
+          }
+        } finally {
+          if (
+            requestId === authOriginsRequest &&
+            projectId === authOriginsProjectSelect.value &&
+            authOriginsLoadedProjectId === projectId
+          ) {
+            authOriginsTextarea.disabled = false;
+            authOriginsSave.disabled = false;
+          }
+        }
+      });
+
+      const authOriginsPanel = element("section", {
+        className: "portal-auth-origins"
+      });
+
+      authOriginsPanel.append(
+        element("h3", {}, "Customer authentication — Allowed origins"),
+        element(
+          "p",
+          {},
+          "Choose which websites may make browser-based customer authentication requests for this project. Use one origin per line, with a maximum of 10."
+        ),
+        element(
+          "p",
+          {},
+          "Production websites must use HTTPS. HTTP is permitted only for localhost and loopback development addresses. Do not include paths or wildcards."
+        ),
+        element(
+          "p",
+          {},
+          "Saving replaces the complete allowed-origin list for the selected project."
+        ),
+        element("label", { className: "portal-field" },
+          "Select project",
+          authOriginsProjectSelect
+        ),
+        element("label", { className: "portal-field" },
+          "Allowed origins",
+          authOriginsTextarea
+        ),
+        authOriginsSave,
+        authOriginsFeedback
+      );
+
+      let authOriginsLoadedProjectId = "";
+      let authOriginsRequest = 0;
+
+      async function loadAuthOrigins() {
+        const projectId = authOriginsProjectSelect.value;
+        const requestId = ++authOriginsRequest;
+
+        authOriginsLoadedProjectId = "";
+        authOriginsTextarea.value = "";
+        authOriginsTextarea.disabled = true;
+        authOriginsSave.disabled = true;
+
+        if (!projectId) {
+          authOriginsFeedback.textContent =
+            "Select a project to manage its allowed origins.";
+          return;
+        }
+
+        authOriginsFeedback.textContent = "Loading allowed origins…";
+
+        try {
+          const result = await api(
+            `/developer/projects/${encodeURIComponent(projectId)}/auth/origins`
+          );
+
+          if (
+            requestId !== authOriginsRequest ||
+            projectId !== authOriginsProjectSelect.value
+          ) {
+            return;
+          }
+
+          const origins = Array.isArray(result.origins)
+            ? result.origins
+            : [];
+
+          authOriginsTextarea.value = origins.join("\n");
+          authOriginsLoadedProjectId = projectId;
+          authOriginsTextarea.disabled = false;
+          authOriginsSave.disabled = false;
+
+          authOriginsFeedback.textContent = origins.length
+            ? `${origins.length} allowed origin(s) loaded.`
+            : "No allowed origins are configured for this project.";
+        } catch (error) {
+          if (requestId !== authOriginsRequest) return;
+
+          authOriginsFeedback.textContent = error.message;
+          if (error.status === 401) {
+            handleWorkspaceError(error);
+          }
+        }
+      }
+
+      authOriginsProjectSelect.addEventListener(
+        "change",
+        loadAuthOrigins
+      );
+
       const usageProjectSelect = element("select", {
         name: "usage_project_id",
         "aria-label": "Project storage usage"
@@ -1215,6 +1407,10 @@
           projectSelect.replaceChildren(
             element("option", { value: "" }, "Select a project")
           );
+          const previousOriginsProject = authOriginsProjectSelect.value;
+          authOriginsProjectSelect.replaceChildren(
+            element("option", { value: "" }, "Select a project")
+          );
           storageProjectSelect.replaceChildren(
             element("option", { value: "" }, "Select a project")
           );
@@ -1230,9 +1426,22 @@
             );
 
             projectSelect.append(option());
+            authOriginsProjectSelect.append(
+              element("option", { value: String(project.id) }, project.name)
+            );
             storageProjectSelect.append(option());
             usageProjectSelect.append(option());
           }
+
+          const retainedOriginsProject = projects.some(
+            (project) => String(project.id) === previousOriginsProject
+          );
+
+          authOriginsProjectSelect.value = retainedOriginsProject
+            ? previousOriginsProject
+            : (projects.length ? String(projects[0].id) : "");
+
+          await loadAuthOrigins();
 
           if (usageProjectSelect.value) {
             await loadStorageUsage();
@@ -1264,8 +1473,27 @@
 
             row.append(
               element("strong", {}, project.name),
-              element("span", {}, `Project ID: ${project.id}`)
+              element("span", {}, `Project ID: ${project.id}`),
+              element(
+                "span",
+                {},
+                `Public Project ID: ${project.public_id || "Unavailable"}`
+              )
             );
+
+            if (typeof project.public_id === "string" && project.public_id) {
+              row.append(button("Copy public ID", async () => {
+                try {
+                  if (!navigator.clipboard?.writeText) {
+                    throw new Error("Clipboard access is unavailable in this browser.");
+                  }
+                  await navigator.clipboard.writeText(project.public_id);
+                  showMessage("Public Project ID copied.");
+                } catch (error) {
+                  showMessage(error.message, true);
+                }
+              }, "portal-secondary-button"));
+            }
 
             projectList.append(row);
           }
@@ -1282,14 +1510,16 @@
           usagePanel,
           heading,
           refresh,
-          projectList
+          projectList,
+          authOriginsPanel
         );
       } else if (page === "projects") {
         panel.append(
           heading,
           createForm,
           refresh,
-          projectList
+          projectList,
+          authOriginsPanel
         );
       } else if (page === "api-keys") {
         panel.append(

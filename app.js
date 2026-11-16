@@ -691,6 +691,8 @@
             ? result.projects
             : [];
 
+          const previousProject = projectSelect.value;
+
           projectSelect.replaceChildren(
             element("option", { value: "" }, "Select a project")
           );
@@ -705,10 +707,17 @@
             );
           }
 
+          if (projects.length > 0) {
+            projectSelect.value = projects.some(
+              (project) => String(project.id) === previousProject
+            ) ? previousProject : String(projects[0].id);
+          }
+
           if (projects.length === 0) {
             projectList.append(
               element("p", {}, "No projects yet. Create your first project.")
             );
+            await loadCustomerAuthUsage();
             return;
           }
 
@@ -724,6 +733,8 @@
 
             projectList.append(row);
           }
+
+          await loadCustomerAuthUsage();
         } catch (error) {
           projectList.replaceChildren();
           handleWorkspaceError(error);
@@ -731,9 +742,288 @@
         }
       }
 
+
+      const customerAuthSection = element("section", {
+        className: "customer-auth-section",
+        "aria-labelledby": "customer-auth-heading"
+      });
+      const customerAuthHeading = element(
+        "h3",
+        { id: "customer-auth-heading" },
+        "Customer Authentication"
+      );
+      const customerAuthDescription = element(
+        "p",
+        { className: "customer-auth-description" },
+        "Prepaid daily active customer units for the selected project. One customer using the service on one UTC calendar day consumes one unit."
+      );
+      const customerAuthStatus = element("p", {
+        className: "customer-auth-status",
+        role: "status",
+        "aria-live": "polite"
+      });
+      const customerAuthBalances = element("div", {
+        className: "customer-auth-balances"
+      });
+      const customerAuthDaily = element("div", {
+        className: "customer-auth-history"
+      });
+      const customerAuthPurchases = element("div", {
+        className: "customer-auth-history"
+      });
+      const customerAuthQuantity = element("input", {
+        type: "number",
+        name: "quantity",
+        min: "1",
+        step: "1",
+        required: "required",
+        inputmode: "numeric"
+      });
+      customerAuthQuantity.value = "100";
+
+      const customerAuthPurchaseForm = element("form", {
+        className: "portal-form customer-auth-purchase-form"
+      });
+      const customerAuthQuantityLabel = element("label", {
+        className: "portal-field"
+      });
+      customerAuthQuantityLabel.append(
+        element("span", {}, "Units to purchase"),
+        customerAuthQuantity,
+        element(
+          "small",
+          {},
+          "Price: SLE 0.25 per unit. Payment is processed through Monime."
+        )
+      );
+      const customerAuthPurchaseButton = element("button", {
+        type: "submit",
+        className: "primary-button"
+      }, "Purchase units");
+      customerAuthPurchaseForm.append(
+        customerAuthQuantityLabel,
+        customerAuthPurchaseButton
+      );
+
+      function formatSle(minor) {
+        const amount = Number(minor);
+        if (!Number.isFinite(amount)) return "Unavailable";
+        return `SLE ${(amount / 100).toFixed(2)}`;
+      }
+
+      function formatUnix(value) {
+        const seconds = Number(value);
+        if (!Number.isFinite(seconds)) return "Unknown";
+        return new Date(seconds * 1000).toLocaleString();
+      }
+
+      function formatUsageDay(day) {
+        const number = Number(day);
+        if (!Number.isInteger(number)) return "Unknown";
+        return new Date(number * 86400000).toLocaleDateString(
+          undefined,
+          { timeZone: "UTC", year: "numeric", month: "short", day: "numeric" }
+        );
+      }
+
+      function balanceCard(label, value, detail = "") {
+        const card = element("article", {
+          className: "customer-auth-balance-card"
+        });
+        card.append(
+          element("span", { className: "customer-auth-balance-label" }, label),
+          element("strong", { className: "customer-auth-balance-value" },
+            Number(value).toLocaleString()),
+          element("small", {}, detail)
+        );
+        return card;
+      }
+
+      let customerAuthRequestId = 0;
+
+      async function loadCustomerAuthUsage() {
+        const requestId = ++customerAuthRequestId;
+        const projectId = projectSelect.value;
+        customerAuthBalances.replaceChildren();
+        customerAuthDaily.replaceChildren();
+        customerAuthPurchases.replaceChildren();
+
+        if (!projectId) {
+          delete customerAuthStatus.dataset.state;
+          customerAuthStatus.textContent =
+            "Create or select a project to view its Customer Authentication units.";
+          return;
+        }
+
+        customerAuthStatus.dataset.state = "loading";
+        customerAuthStatus.textContent = "Loading project usage…";
+        customerAuthBalances.append(
+          element("p", {}, "Loading unit balance…")
+        );
+
+        try {
+          const usage = await api(
+            `/projects/${encodeURIComponent(projectId)}/auth/units/usage`
+          );
+
+          if (
+            requestId !== customerAuthRequestId ||
+            projectSelect.value !== projectId
+          ) {
+            return;
+          }
+
+          delete customerAuthStatus.dataset.state;
+
+          customerAuthBalances.replaceChildren(
+            balanceCard("Free units", usage.free_units, "One-time project grant"),
+            balanceCard("Purchased units", usage.purchased_units, "Settled purchases"),
+            balanceCard("Total units", usage.total_units, "Free + purchased"),
+            balanceCard("Used units", usage.used_units, "Billable customer-days"),
+            balanceCard("Remaining units", usage.remaining_units, "Available balance")
+          );
+
+          customerAuthStatus.textContent =
+            `Billing: prepaid daily active customer units · Timezone: ${usage.usage_timezone || "UTC"} · Unit price: ${formatSle(usage.unit_price_minor)}.`;
+
+          customerAuthDaily.replaceChildren(
+            element("h4", {}, "Daily usage (latest 30 days)")
+          );
+          const dailyRows = Array.isArray(usage.daily_usage)
+            ? usage.daily_usage
+            : [];
+
+          if (dailyRows.length === 0) {
+            customerAuthDaily.append(element("p", {}, "No billable usage recorded yet."));
+          } else {
+            for (const item of dailyRows) {
+              const row = element("div", { className: "customer-auth-history-row" });
+              row.append(
+                element("span", {}, formatUsageDay(item.usage_day)),
+                element("strong", {}, `${Number(item.units).toLocaleString()} units`)
+              );
+              customerAuthDaily.append(row);
+            }
+          }
+
+          customerAuthPurchases.replaceChildren(
+            element("h4", {}, "Purchase history (latest 25)")
+          );
+          const purchases = Array.isArray(usage.purchases)
+            ? usage.purchases
+            : [];
+
+          if (purchases.length === 0) {
+            customerAuthPurchases.append(element("p", {}, "No purchases recorded yet."));
+          } else {
+            for (const purchase of purchases) {
+              const row = element("div", { className: "customer-auth-history-row" });
+              const details = element("span");
+              details.append(
+                element("strong", {}, `${Number(purchase.quantity).toLocaleString()} units`),
+                element("small", {}, ` · ${formatUnix(purchase.created_at)}`)
+              );
+              row.append(
+                details,
+                element(
+                  "span",
+                  {},
+                  `${formatSle(purchase.amount_minor)} · ${String(purchase.status || "unknown")}`
+                )
+              );
+              customerAuthPurchases.append(row);
+            }
+          }
+        } catch (error) {
+          if (
+            requestId !== customerAuthRequestId ||
+            projectSelect.value !== projectId
+          ) {
+            return;
+          }
+
+          customerAuthBalances.replaceChildren();
+          customerAuthDaily.replaceChildren();
+          customerAuthPurchases.replaceChildren();
+          customerAuthStatus.textContent =
+            error.message || "Could not load Customer Authentication usage.";
+          customerAuthStatus.dataset.state = "error";
+          if (error.status === 401) handleWorkspaceError(error);
+        }
+      }
+
+      projectSelect.addEventListener("change", () => {
+        loadCustomerAuthUsage();
+      });
+
+      customerAuthPurchaseForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const projectId = projectSelect.value;
+        const quantity = Number(customerAuthQuantity.value);
+
+        if (!projectId) {
+          customerAuthStatus.textContent = "Select a project before purchasing units.";
+          customerAuthStatus.dataset.state = "error";
+          return;
+        }
+
+        if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+          customerAuthStatus.textContent = "Enter a valid whole-number unit quantity.";
+          customerAuthStatus.dataset.state = "error";
+          return;
+        }
+
+        customerAuthPurchaseButton.disabled = true;
+        customerAuthStatus.textContent = "Creating Monime checkout…";
+        customerAuthStatus.dataset.state = "loading";
+
+        try {
+          const result = await api(
+            `/projects/${encodeURIComponent(projectId)}/auth/units/checkout`,
+            {
+              method: "POST",
+              body: JSON.stringify({ quantity })
+            }
+          );
+
+          const checkoutUrl = new URL(result.checkout_url);
+          if (checkoutUrl.protocol !== "https:") {
+            throw new Error("The payment provider returned an unsafe checkout URL.");
+          }
+
+          customerAuthStatus.textContent =
+            "Checkout created. Redirecting to Monime. Units are added only after payment is confirmed.";
+          window.location.assign(checkoutUrl.href);
+        } catch (error) {
+          customerAuthStatus.textContent =
+            error.message || "Could not create the checkout. Check purchase history before retrying.";
+          customerAuthStatus.dataset.state = "error";
+          if (error.status === 401) handleWorkspaceError(error);
+        } finally {
+          customerAuthPurchaseButton.disabled = false;
+        }
+      });
+
+      customerAuthSection.append(
+        customerAuthHeading,
+        customerAuthDescription,
+        customerAuthStatus,
+        customerAuthBalances,
+        customerAuthPurchaseForm,
+        customerAuthDaily,
+        customerAuthPurchases
+      );
+      const refreshCustomerAuth = button(
+        "Refresh Customer Authentication usage",
+        loadCustomerAuthUsage
+      );
+      customerAuthSection.append(refreshCustomerAuth);
+
       panel.append(
         heading,
         createForm,
+        customerAuthSection,
         keyHeading,
         keyForm,
         createdKeyPanel,

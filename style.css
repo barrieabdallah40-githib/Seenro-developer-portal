@@ -375,3 +375,87 @@ footer a { color: var(--text); text-decoration: none; }
     gap: .65rem;
   }
 }
+
+
+/* Customer Authentication prepaid units */
+.customer-auth-section {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.customer-auth-section h3,
+.customer-auth-section h4 {
+  margin: 0;
+}
+.customer-auth-description,
+.customer-auth-section small {
+  color: var(--muted);
+}
+.customer-auth-status {
+  overflow-wrap: anywhere;
+}
+.customer-auth-status[data-state="error"] {
+  color: #ff9292;
+}
+.customer-auth-balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: .75rem;
+}
+.customer-auth-balance-card {
+  display: grid;
+  gap: .25rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.025);
+}
+.customer-auth-balance-label {
+  color: var(--muted);
+  font-size: .85rem;
+}
+.customer-auth-balance-value {
+  font-size: 1.65rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.customer-auth-balance-card small {
+  font-size: .78rem;
+}
+.customer-auth-purchase-form {
+  max-width: 520px;
+}
+.customer-auth-purchase-form input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: .8rem;
+  border: 1px solid rgba(127,127,127,.45);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.customer-auth-history {
+  display: grid;
+  gap: .6rem;
+}
+.customer-auth-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  padding: .75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.customer-auth-history-row small {
+  display: block;
+}
+.customer-auth-section button:disabled {
+  opacity: .6;
+  cursor: wait;
+}

@@ -872,6 +872,193 @@
         }
       });
 
+
+      // Customer Authentication prepaid-unit balance and history.
+      const customerAuthUsagePanel = element("section", {
+        className: "portal-auth-usage"
+      });
+      const customerAuthUsageStatus = element("p", {
+        role: "status", "aria-live": "polite"
+      }, "Select a project to view its authentication units.");
+      const customerAuthBalances = element("div", {
+        className: "customer-auth-balances"
+      });
+      const customerAuthDaily = element("div", {
+        className: "customer-auth-history"
+      });
+      const customerAuthPurchases = element("div", {
+        className: "customer-auth-history"
+      });
+      const customerAuthRefresh = element("button", {
+        type: "button", className: "secondary-button"
+      }, "Refresh usage");
+
+      customerAuthUsagePanel.append(
+        element("h3", {}, "Unit balance"),
+        element("p", {}, "One unit is consumed by one unique customer active in this project on one UTC calendar day. Multiple sessions by the same customer that day count once."),
+        customerAuthUsageStatus,
+        customerAuthBalances,
+        customerAuthDaily,
+        customerAuthPurchases,
+        customerAuthRefresh
+      );
+
+      function formatAuthMoney(minor) {
+        const amount = Number(minor);
+        return Number.isFinite(amount)
+          ? `SLE ${(amount / 100).toFixed(2)}`
+          : "Unavailable";
+      }
+
+      function formatAuthTimestamp(value) {
+        const seconds = Number(value);
+        return Number.isFinite(seconds)
+          ? new Date(seconds * 1000).toLocaleString()
+          : "Unknown";
+      }
+
+      function formatAuthDay(day) {
+        const number = Number(day);
+        if (!Number.isInteger(number)) return "Unknown";
+        return new Date(number * 86400000).toLocaleDateString(
+          undefined,
+          { timeZone: "UTC", year: "numeric", month: "short", day: "numeric" }
+        );
+      }
+
+      function authBalanceCard(label, value, detail) {
+        const number = Number(value);
+        const card = element("article", {
+          className: "customer-auth-balance-card"
+        });
+        card.append(
+          element("span", {
+            className: "customer-auth-balance-label"
+          }, label),
+          element("strong", {
+            className: "customer-auth-balance-value"
+          }, Number.isFinite(number) ? number.toLocaleString() : "Unavailable"),
+          element("small", {}, detail)
+        );
+        return card;
+      }
+
+      let customerAuthUsageRequestId = 0;
+
+      async function loadCustomerAuthUsage() {
+        const requestId = ++customerAuthUsageRequestId;
+        const projectId = authOriginsProjectSelect.value;
+
+        customerAuthBalances.replaceChildren();
+        customerAuthDaily.replaceChildren();
+        customerAuthPurchases.replaceChildren();
+
+        if (!projectId) {
+          delete customerAuthUsageStatus.dataset.state;
+          customerAuthUsageStatus.textContent =
+            "Create or select a project to view its Customer Authentication units.";
+          return;
+        }
+
+        customerAuthUsageStatus.dataset.state = "loading";
+        customerAuthUsageStatus.textContent = "Loading project usage…";
+
+        try {
+          const usage = await api(
+            `/projects/${encodeURIComponent(projectId)}/auth/units/usage`
+          );
+
+          if (
+            requestId !== customerAuthUsageRequestId ||
+            authOriginsProjectSelect.value !== projectId
+          ) return;
+
+          delete customerAuthUsageStatus.dataset.state;
+
+          customerAuthBalances.replaceChildren(
+            authBalanceCard("Free units", usage.free_units, "One-time allocation"),
+            authBalanceCard("Purchased units", usage.purchased_units, "Settled purchases"),
+            authBalanceCard("Total units", usage.total_units, "Free + purchased"),
+            authBalanceCard("Used units", usage.used_units, "Billable customer-days"),
+            authBalanceCard("Remaining units", usage.remaining_units, "Available balance")
+          );
+
+          customerAuthUsageStatus.textContent =
+            `Billing: prepaid daily active customer units · ` +
+            `Timezone: ${usage.usage_timezone || "UTC"} · ` +
+            `Unit price: ${formatAuthMoney(usage.unit_price_minor)}.`;
+
+          customerAuthDaily.append(
+            element("h4", {}, "Daily usage (latest 30 days)")
+          );
+
+          const days = Array.isArray(usage.daily_usage)
+            ? usage.daily_usage : [];
+
+          if (!days.length) {
+            customerAuthDaily.append(
+              element("p", {}, "No billable usage recorded yet.")
+            );
+          }
+
+          for (const item of days) {
+            const row = element("div", {
+              className: "customer-auth-history-row"
+            });
+            row.append(
+              element("span", {}, formatAuthDay(item.usage_day)),
+              element("strong", {}, `${Number(item.units).toLocaleString()} units`)
+            );
+            customerAuthDaily.append(row);
+          }
+
+          customerAuthPurchases.append(
+            element("h4", {}, "Purchase history (latest 25)")
+          );
+
+          const purchases = Array.isArray(usage.purchases)
+            ? usage.purchases : [];
+
+          if (!purchases.length) {
+            customerAuthPurchases.append(
+              element("p", {}, "No purchases recorded yet.")
+            );
+          }
+
+          for (const purchase of purchases) {
+            const row = element("div", {
+              className: "customer-auth-history-row"
+            });
+            const details = element("span");
+            details.append(
+              element("strong", {}, `${Number(purchase.quantity).toLocaleString()} units`),
+              element("small", {}, ` · ${formatAuthTimestamp(purchase.created_at)}`)
+            );
+            row.append(
+              details,
+              element("span", {}, `${formatAuthMoney(purchase.amount_minor)} · ${String(purchase.status || "unknown")}`)
+            );
+            customerAuthPurchases.append(row);
+          }
+        } catch (error) {
+          if (
+            requestId !== customerAuthUsageRequestId ||
+            authOriginsProjectSelect.value !== projectId
+          ) return;
+
+          customerAuthBalances.replaceChildren();
+          customerAuthDaily.replaceChildren();
+          customerAuthPurchases.replaceChildren();
+          customerAuthUsageStatus.textContent =
+            error.message || "Could not load Customer Authentication usage.";
+          customerAuthUsageStatus.dataset.state = "error";
+
+          if (error.status === 401) handleWorkspaceError(error);
+        }
+      }
+
+      customerAuthRefresh.addEventListener("click", loadCustomerAuthUsage);
+
       let authOriginsLoadedProjectId = "";
       let authOriginsRequest = 0;
 
@@ -1670,6 +1857,10 @@
         }
       }
 
+      authOriginsProjectSelect.addEventListener("change", () => {
+        loadCustomerAuthUsage();
+      });
+
       async function loadProjects() {
         const needsProjectList = page === "dashboard" || page === "projects";
 
@@ -1738,6 +1929,7 @@
           // Load only the service data needed by the current page.
           if (page === "customer-auth") {
             await loadAuthOrigins();
+            await loadCustomerAuthUsage();
           }
 
           if (page === "dashboard" || page === "storage") {
@@ -1966,7 +2158,12 @@
           docsPanel.append(document.importNode(child, true));
         }
 
-        panel.append(docsPanel, authUnitsPanel, authOriginsPanel);
+        panel.append(
+          docsPanel,
+          authUnitsPanel,
+          customerAuthUsagePanel,
+          authOriginsPanel
+        );
       } else if (page === "api-keys") {
         panel.append(
           keyHeading,

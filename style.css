@@ -1211,3 +1211,89 @@ body.portal-sidebar-collapsed {
     justify-content: flex-start;
   }
 }
+
+
+/* Customer Authentication prepaid-unit balance and history */
+.portal-auth-usage {
+  display: grid;
+  gap: 1rem;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.portal-auth-usage h3,
+.portal-auth-usage h4,
+.portal-auth-usage p {
+  margin-top: 0;
+}
+
+.portal-auth-usage h3,
+.portal-auth-usage h4 {
+  margin-bottom: 0;
+}
+
+.portal-auth-usage > p {
+  margin-bottom: 0;
+}
+
+.portal-auth-usage [role="status"] {
+  overflow-wrap: anywhere;
+}
+
+.portal-auth-usage [role="status"][data-state="error"] {
+  color: #ff9292;
+}
+
+.customer-auth-balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: .75rem;
+}
+
+.customer-auth-balance-card {
+  display: grid;
+  gap: .25rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.customer-auth-balance-label,
+.customer-auth-balance-card small,
+.customer-auth-history-row small {
+  color: var(--muted);
+}
+
+.customer-auth-balance-value {
+  font-size: 1.65rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.customer-auth-balance-card small {
+  font-size: .78rem;
+}
+
+.customer-auth-history {
+  display: grid;
+  gap: .6rem;
+  min-width: 0;
+}
+
+.customer-auth-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  padding: .75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.customer-auth-history-row small {
+  display: block;
+}

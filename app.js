@@ -97,11 +97,163 @@
       return;
     }
 
-    const workspacePages = ["dashboard", "projects", "storage", "api-keys", "storage-keys", "account"];
+    const workspacePages = ["dashboard", "projects", "storage", "customer-auth", "api-keys", "storage-keys", "account"];
     if (!["login", "register", ...workspacePages].includes(page)) return;
 
     const main = document.querySelector("main");
     if (!main) return;
+
+    // Shared SEENRO developer workspace navigation.
+    if (workspacePages.includes(page)) {
+      const header = document.querySelector(".topbar");
+      if (header) {
+        const sidebar = element("aside", {
+          className: "portal-sidebar",
+          id: "portal-sidebar",
+          "aria-label": "Developer workspace sidebar"
+        });
+
+        const sidebarBrand = element("a", {
+          className: "portal-sidebar-brand",
+          href: "dashboard.html"
+        });
+        sidebarBrand.append(
+          element("span", { className: "portal-sidebar-mark" }, "S"),
+          element("span", { className: "portal-sidebar-brand-copy" }, "SEENRO")
+        );
+        sidebar.append(sidebarBrand);
+
+        const sidebarNav = element("nav", {
+          className: "portal-sidebar-nav",
+          "aria-label": "Main workspace navigation"
+        });
+
+        const groups = [
+          {
+            title: "WORKSPACE",
+            links: [
+              ["Overview", "dashboard.html", "dashboard"],
+              ["Projects", "projects.html", "projects"]
+            ]
+          },
+          {
+            title: "BUILD",
+            links: [
+              ["Customer Authentication", "customer-auth.html", "customer-auth"],
+              ["Storage", "storage.html", "storage"]
+            ]
+          },
+          {
+            title: "DEVELOP",
+            links: [
+              ["Integration Guides", "docs.html", "docs"],
+              ["API Reference", "docs.html#api-reference", "api-reference"]
+            ]
+          },
+          {
+            title: "MANAGE",
+            links: [
+              ["Developer API keys", "api-keys.html", "api-keys"],
+              ["Storage API keys", "storage-keys.html", "storage-keys"],
+              ["Account settings", "account.html", "account"]
+            ]
+          }
+        ];
+
+        for (const group of groups) {
+          const groupSection = element("section", {
+            className: "portal-sidebar-group"
+          });
+          groupSection.append(
+            element("h2", { className: "portal-sidebar-group-title" }, group.title)
+          );
+
+          for (const [label, href, key] of group.links) {
+            const link = element("a", {
+              className: "portal-sidebar-link",
+              href,
+              title: label
+            });
+            link.append(
+              element("span", { className: "portal-sidebar-link-label" }, label)
+            );
+
+            if (key === page) {
+              link.classList.add("active");
+              link.setAttribute("aria-current", "page");
+            }
+            groupSection.append(link);
+          }
+
+          sidebarNav.append(groupSection);
+        }
+
+        const buildStatus = element("div", {
+          className: "portal-sidebar-coming-soon"
+        });
+        buildStatus.append(
+          element("span", { className: "portal-sidebar-coming-soon-title" }, "DATABASE"),
+          element("span", {}, "Coming soon")
+        );
+
+        const sidebarBottom = element("div", {
+          className: "portal-sidebar-bottom"
+        });
+        const docsLink = element("a", {
+          href: "docs.html",
+          className: "portal-sidebar-bottom-link"
+        }, "Documentation");
+        sidebarBottom.append(buildStatus, docsLink);
+
+        sidebar.append(sidebarNav, sidebarBottom);
+        document.body.insertBefore(sidebar, header);
+
+        const backdrop = element("button", {
+          type: "button",
+          className: "portal-sidebar-backdrop",
+          "aria-label": "Close navigation"
+        });
+        backdrop.addEventListener("click", () => {
+          document.body.classList.remove("portal-sidebar-open");
+        });
+        document.body.insertBefore(backdrop, header);
+
+        const toggle = element("button", {
+          type: "button",
+          className: "portal-sidebar-toggle",
+          "aria-label": "Toggle workspace navigation",
+          "aria-controls": "portal-sidebar",
+          "aria-expanded": "false"
+        }, "☰");
+        toggle.addEventListener("click", () => {
+          const mobile = window.matchMedia("(max-width: 760px)").matches;
+          const className = mobile
+            ? "portal-sidebar-open"
+            : "portal-sidebar-collapsed";
+          document.body.classList.toggle(className);
+          const expanded = mobile
+            ? document.body.classList.contains("portal-sidebar-open")
+            : !document.body.classList.contains("portal-sidebar-collapsed");
+          toggle.setAttribute("aria-expanded", String(expanded));
+        });
+        header.prepend(toggle);
+
+        for (const link of sidebar.querySelectorAll("a")) {
+          link.addEventListener("click", () => {
+            document.body.classList.remove("portal-sidebar-open");
+          });
+        }
+
+        document.body.classList.add("portal-sidebar-shell");
+      }
+    }
+
+    for (const link of document.querySelectorAll(".portal-page-nav a")) {
+      if (link.getAttribute("href") === `${page}.html`) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+    }
 
     const section = element("section", {
       className: "section portal-console",
@@ -121,6 +273,7 @@
           dashboard: "Workspace",
           projects: "Projects",
           storage: "Storage",
+          "customer-auth": "Customer Authentication",
           "api-keys": "Developer API keys",
           "storage-keys": "Storage API keys",
           account: "Account",
@@ -595,11 +748,137 @@
         authOriginsFeedback
       );
 
+      const authUnitsQuantityInput = element("input", {
+        type: "number", name: "auth_units_quantity",
+        min: "1", max: "1000000", step: "1",
+        value: "100", inputmode: "numeric"
+      });
+      const authUnitsQuantityField = element("label", {
+        className: "portal-field"
+      });
+      authUnitsQuantityField.append(
+        element("span", {}, "Number of authentication units"),
+        authUnitsQuantityInput
+      );
+
+      const authUnitsPriceSummary = element(
+        "p", {}, "SLE 0.25 per unit. Core confirms the checkout amount."
+      );
+      const authUnitsCheckoutStatus = element("p", {
+        role: "status", "aria-live": "polite"
+      }, "Select a project and quantity to continue to Monime.");
+
+      const authUnitsCheckoutButton = element("button", {
+        type: "button", className: "primary-button"
+      }, "Buy Authentication Units");
+      authUnitsCheckoutButton.disabled = true;
+
+      const authUnitsPanel = element("section", {
+        className: "portal-auth-billing"
+      });
+      authUnitsPanel.append(
+        element("h3", {}, "Customer Authentication — prepaid units"),
+        element("p", {}, "Each project receives its one-time free allocation of 100 units. Additional units are prepaid and separate from Storage subscriptions and credits."),
+        element("p", {}, "One unit covers one unique customer active in this project on one UTC calendar day. Repeat sessions by that customer on the same day count once."),
+        authUnitsQuantityField,
+        authUnitsPriceSummary,
+        authUnitsCheckoutButton,
+        authUnitsCheckoutStatus
+      );
+
+      let authUnitsCheckoutInProgress = false;
+
+      authUnitsQuantityInput.addEventListener("input", () => {
+        const quantity = Number(authUnitsQuantityInput.value);
+        if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) {
+          authUnitsPriceSummary.textContent =
+            "Enter a whole number from 1 to 1,000,000. SLE 0.25 per unit.";
+          return;
+        }
+        authUnitsPriceSummary.textContent =
+          `Estimated total: SLE ${(quantity * 25 / 100).toFixed(2)} ` +
+          `(${quantity.toLocaleString()} units at SLE 0.25 each). ` +
+          "Core confirms the final amount.";
+      });
+
+      authUnitsCheckoutButton.addEventListener("click", async () => {
+        const projectId = authOriginsProjectSelect.value;
+        const quantity = Number(authUnitsQuantityInput.value);
+
+        if (!projectId) {
+          authUnitsCheckoutStatus.textContent = "Select a project first.";
+          return;
+        }
+        if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) {
+          authUnitsCheckoutStatus.textContent =
+            "Enter a whole number from 1 to 1,000,000.";
+          return;
+        }
+        if (authUnitsCheckoutInProgress) return;
+
+        authUnitsCheckoutInProgress = true;
+        authUnitsCheckoutButton.disabled = true;
+        authUnitsCheckoutStatus.textContent =
+          "Creating your secure Monime checkout…";
+
+        try {
+          const result = await api(
+            `/projects/${encodeURIComponent(projectId)}/auth/units/checkout`,
+            {
+              method: "POST",
+              body: JSON.stringify({ quantity })
+            }
+          );
+
+          // Keep the checkout for the project selected when the request began.
+          // A later selector change must not discard the returned checkout URL.
+
+          const checkoutUrl = new URL(result.checkout_url);
+          if (
+            checkoutUrl.protocol !== "https:" ||
+            checkoutUrl.hostname !== "checkout.monime.io" ||
+            checkoutUrl.username ||
+            checkoutUrl.password ||
+            checkoutUrl.port
+          ) {
+            throw new Error(
+              "Core returned a checkout URL that failed Monime security validation."
+            );
+          }
+
+          const amount = Number(result.amount_minor);
+          const currency = typeof result.currency === "string"
+            ? result.currency : "SLE";
+          const total = Number.isSafeInteger(amount)
+            ? `${currency} ${(amount / 100).toFixed(2)}`
+            : "the amount confirmed by Core";
+
+          authUnitsCheckoutStatus.textContent =
+            projectId !== authOriginsProjectSelect.value
+              ? `Checkout created for project ${projectId} (${total}). Opening its Monime checkout…`
+              : `Checkout created for ${quantity.toLocaleString()} units ` +
+                `(${total}). Redirecting to Monime…`;
+          window.location.assign(checkoutUrl.href);
+        } catch (error) {
+          if (projectId === authOriginsProjectSelect.value) {
+            authUnitsCheckoutStatus.textContent =
+              error.message || "Could not create checkout. Please try again.";
+          }
+          if (error.status === 401) handleWorkspaceError(error);
+        } finally {
+          authUnitsCheckoutInProgress = false;
+          authUnitsCheckoutButton.disabled =
+            !authOriginsProjectSelect.value;
+        }
+      });
+
       let authOriginsLoadedProjectId = "";
       let authOriginsRequest = 0;
 
       async function loadAuthOrigins() {
         const projectId = authOriginsProjectSelect.value;
+        authUnitsCheckoutButton.disabled =
+          !projectId || authUnitsCheckoutInProgress;
         const requestId = ++authOriginsRequest;
 
         authOriginsLoadedProjectId = "";
@@ -700,7 +979,7 @@
       const storageCheckoutButton = element("button", {
         type: "button",
         className: "primary-button"
-      }, "Pay with Monime");
+      }, "Subscribe with Monime");
 
       const keyHeading = element("h3", {}, "API keys");
       const keyList = element("div", {
@@ -1392,72 +1671,108 @@
       }
 
       async function loadProjects() {
-        projectList.replaceChildren(
-          element("p", {}, "Loading projects…")
-        );
+        const needsProjectList = page === "dashboard" || page === "projects";
+
+        if (needsProjectList) {
+          projectList.replaceChildren(
+            element("p", {}, "Loading projects…")
+          );
+        }
 
         try {
           const result = await api("/developer/projects");
-          projectList.replaceChildren();
-
           const projects = Array.isArray(result.projects)
             ? result.projects
             : [];
 
-          projectSelect.replaceChildren(
-            element("option", { value: "" }, "Select a project")
-          );
-          const previousOriginsProject = authOriginsProjectSelect.value;
-          authOriginsProjectSelect.replaceChildren(
-            element("option", { value: "" }, "Select a project")
-          );
-          storageProjectSelect.replaceChildren(
-            element("option", { value: "" }, "Select a project")
-          );
-          usageProjectSelect.replaceChildren(
-            element("option", { value: "" }, "Select a project")
-          );
+          // Preserve each page's project selection when refreshing.
+          const previous = {
+            api: projectSelect.value,
+            auth: authOriginsProjectSelect.value,
+            storage: storageProjectSelect.value,
+            usage: usageProjectSelect.value
+          };
+
+          const selectors = [
+            projectSelect,
+            authOriginsProjectSelect,
+            storageProjectSelect,
+            usageProjectSelect
+          ];
+
+          for (const select of selectors) {
+            select.replaceChildren(
+              element("option", { value: "" }, "Select a project")
+            );
+          }
 
           for (const project of projects) {
-            const option = () => element(
-              "option",
-              { value: String(project.id) },
-              project.name
-            );
+            const id = String(project.id);
+            const addOption = (select) => {
+              select.append(
+                element("option", { value: id }, project.name)
+              );
+            };
 
-            projectSelect.append(option());
-            authOriginsProjectSelect.append(
-              element("option", { value: String(project.id) }, project.name)
-            );
-            storageProjectSelect.append(option());
-            usageProjectSelect.append(option());
+            for (const select of selectors) {
+              addOption(select);
+            }
           }
 
-          const retainedOriginsProject = projects.some(
-            (project) => String(project.id) === previousOriginsProject
-          );
-
-          authOriginsProjectSelect.value = retainedOriginsProject
-            ? previousOriginsProject
-            : (projects.length ? String(projects[0].id) : "");
-
-          await loadAuthOrigins();
-
-          if (usageProjectSelect.value) {
-            await loadStorageUsage();
-          } else {
-            usagePanel.replaceChildren(
-              element("p", {}, "Create a project to start viewing storage usage.")
+          const restoreSelection = (select, oldValue, defaultFirst = false) => {
+            const exists = projects.some(
+              (project) => String(project.id) === oldValue
             );
+            select.value = exists
+              ? oldValue
+              : (defaultFirst && projects.length
+                  ? String(projects[0].id)
+                  : "");
+          };
+
+          restoreSelection(projectSelect, previous.api);
+          restoreSelection(authOriginsProjectSelect, previous.auth, true);
+          restoreSelection(storageProjectSelect, previous.storage);
+          restoreSelection(usageProjectSelect, previous.usage);
+
+          // Load only the service data needed by the current page.
+          if (page === "customer-auth") {
+            await loadAuthOrigins();
           }
 
-          if (storageProjectSelect.value) {
-            await loadStorageKeys();
-          } else {
-            storageKeyList.replaceChildren(
-              element("p", {}, "Select a project to view its storage keys.")
-            );
+          if (page === "dashboard" || page === "storage") {
+            if (usageProjectSelect.value) {
+              await loadStorageUsage();
+            } else {
+              usagePanel.replaceChildren(
+                element(
+                  "p",
+                  {},
+                  "Select a project to view its storage usage."
+                )
+              );
+            }
           }
+
+          if (page === "storage-keys") {
+            if (storageProjectSelect.value) {
+              await loadStorageKeys();
+            } else {
+              storageKeyList.replaceChildren(
+                element(
+                  "p",
+                  {},
+                  "Select a project to view its storage keys."
+                )
+              );
+            }
+          }
+
+          if (!needsProjectList) {
+            return;
+          }
+
+          projectList.replaceChildren();
 
           if (projects.length === 0) {
             projectList.append(
@@ -1481,11 +1796,16 @@
               )
             );
 
-            if (typeof project.public_id === "string" && project.public_id) {
+            if (
+              typeof project.public_id === "string" &&
+              project.public_id
+            ) {
               row.append(button("Copy public ID", async () => {
                 try {
                   if (!navigator.clipboard?.writeText) {
-                    throw new Error("Clipboard access is unavailable in this browser.");
+                    throw new Error(
+                      "Clipboard access is unavailable in this browser."
+                    );
                   }
                   await navigator.clipboard.writeText(project.public_id);
                   showMessage("Public Project ID copied.");
@@ -1498,29 +1818,155 @@
             projectList.append(row);
           }
         } catch (error) {
-          projectList.replaceChildren();
+          if (needsProjectList) {
+            projectList.replaceChildren();
+          }
           handleWorkspaceError(error);
-
         }
       }
 
       if (page === "dashboard") {
+        // Overview uses the existing project list and Storage usage loaders.
+        const overviewHero = element("section", {
+          className: "overview-hero"
+        });
+        overviewHero.append(
+          element("p", { className: "overview-eyebrow" }, "SEENRO DEVELOPER WORKSPACE"),
+          element("h2", {}, "Build and manage your applications"),
+          element(
+            "p",
+            {},
+            "Create a project, configure the services it needs, integrate with your application, and monitor usage from one workspace."
+          )
+        );
+
+        const overviewActions = element("div", {
+          className: "overview-actions"
+        });
+        overviewActions.append(
+          element("a", {
+            href: "projects.html",
+            className: "overview-action overview-action-primary"
+          }, "Create or manage projects"),
+          element("a", {
+            href: "customer-auth.html",
+            className: "overview-action"
+          }, "Configure Customer Authentication"),
+          element("a", {
+            href: "storage.html",
+            className: "overview-action"
+          }, "Configure Storage"),
+          element("a", {
+            href: "docs.html",
+            className: "overview-action"
+          }, "Read integration guides")
+        );
+
+        const overviewSectionTitle = element("h3", {}, "Platform services");
+        const overviewServices = element("div", {
+          className: "overview-services"
+        });
+
+        const serviceCard = (title, description, status, href) => {
+          const card = element("article", {
+            className: "overview-service-card"
+          });
+          const cardHeading = element("div", {
+            className: "overview-service-heading"
+          });
+          cardHeading.append(
+            element("h4", {}, title),
+            element("span", {
+              className: "overview-service-status"
+            }, status)
+          );
+          card.append(
+            cardHeading,
+            element("p", {}, description)
+          );
+          if (href) {
+            card.append(element("a", {
+              href,
+              className: "overview-service-link"
+            }, "Open service"));
+          }
+          return card;
+        };
+
+        overviewServices.append(
+          serviceCard(
+            "Customer Authentication",
+            "Configure phone-based customer authentication for applications built with SEENRO.",
+            "Configure",
+            "customer-auth.html"
+          ),
+          serviceCard(
+            "Storage",
+            "Manage project storage settings and review the available usage information.",
+            "Configure",
+            "storage.html"
+          ),
+          serviceCard(
+            "Database",
+            "The managed database service is still under development.",
+            "Coming soon",
+            null
+          ),
+          serviceCard(
+            "Developer documentation",
+            "Explore integration guidance and API information for building with SEENRO.",
+            "Documentation",
+            "docs.html"
+          )
+        );
+
         panel.append(
-          usageProjectField,
-          usagePanel,
+          overviewHero,
+          overviewActions,
+          overviewSectionTitle,
+          overviewServices,
           heading,
           refresh,
           projectList,
-          authOriginsPanel
+          usageProjectField,
+          usagePanel
         );
       } else if (page === "projects") {
         panel.append(
           heading,
           createForm,
           refresh,
-          projectList,
-          authOriginsPanel
+          projectList
         );
+      } else if (page === "customer-auth") {
+        const docsResponse = await fetch("customer-auth-content.html", {
+          credentials: "same-origin"
+        });
+
+        if (!docsResponse.ok) {
+          throw new Error("Customer Authentication documentation could not be loaded.");
+        }
+
+        const docsMarkup = await docsResponse.text();
+        const parsedDocs = new DOMParser().parseFromString(
+          docsMarkup,
+          "text/html"
+        );
+        const sourceDocs = parsedDocs.querySelector(".auth-docs");
+
+        if (!sourceDocs) {
+          throw new Error("Customer Authentication documentation is incomplete.");
+        }
+
+        const docsPanel = element("div", {
+          className: "portal-docs"
+        });
+
+        for (const child of sourceDocs.childNodes) {
+          docsPanel.append(document.importNode(child, true));
+        }
+
+        panel.append(docsPanel, authUnitsPanel, authOriginsPanel);
       } else if (page === "api-keys") {
         panel.append(
           keyHeading,
@@ -1557,7 +2003,10 @@
       }
 
       await loadProjects();
-      await loadKeys();
+
+      if (page === "api-keys") {
+        await loadKeys();
+      }
     }
 
     handleEmailLink().then((handled) => {

@@ -773,11 +773,34 @@
       }, "Buy Authentication Units");
       authUnitsCheckoutButton.disabled = true;
 
+      // Billing has its own project selector, separate from origin settings.
+      const authUnitsProjectSelect = element("select", {
+        name: "auth_units_project_id",
+        "aria-label": "Project authentication usage and billing"
+      });
+      authUnitsProjectSelect.append(
+        element("option", { value: "" }, "Select a project")
+      );
+
+      const authUnitsProjectField = element("label", {
+        className: "portal-field"
+      });
+      authUnitsProjectField.append(
+        element("span", {}, "Authentication usage and billing for project"),
+        authUnitsProjectSelect
+      );
+
+      const authUnitsUsagePanel = element("div", {
+        className: "portal-usage-grid"
+      });
+
       const authUnitsPanel = element("section", {
         className: "portal-auth-billing"
       });
       authUnitsPanel.append(
-        element("h3", {}, "Customer Authentication — prepaid units"),
+        element("h3", {}, "Customer Authentication — usage and prepaid units"),
+        authUnitsProjectField,
+        authUnitsUsagePanel,
         element("p", {}, "Each project receives its one-time free allocation of 100 units. Additional units are prepaid and separate from Storage subscriptions and credits."),
         element("p", {}, "One unit covers one unique customer active in this project on one UTC calendar day. Repeat sessions by that customer on the same day count once."),
         authUnitsQuantityField,
@@ -802,7 +825,7 @@
       });
 
       authUnitsCheckoutButton.addEventListener("click", async () => {
-        const projectId = authOriginsProjectSelect.value;
+        const projectId = authUnitsProjectSelect.value;
         const quantity = Number(authUnitsQuantityInput.value);
 
         if (!projectId) {
@@ -854,13 +877,12 @@
             : "the amount confirmed by Core";
 
           authUnitsCheckoutStatus.textContent =
-            projectId !== authOriginsProjectSelect.value
-              ? `Checkout created for project ${projectId} (${total}). Opening its Monime checkout…`
-              : `Checkout created for ${quantity.toLocaleString()} units ` +
-                `(${total}). Redirecting to Monime…`;
+            `Checkout created for project ${projectId}: ` +
+            `${quantity.toLocaleString()} units (${total}). ` +
+            "Redirecting to Monime…";
           window.location.assign(checkoutUrl.href);
         } catch (error) {
-          if (projectId === authOriginsProjectSelect.value) {
+          if (projectId === authUnitsProjectSelect.value) {
             authUnitsCheckoutStatus.textContent =
               error.message || "Could not create checkout. Please try again.";
           }
@@ -868,7 +890,7 @@
         } finally {
           authUnitsCheckoutInProgress = false;
           authUnitsCheckoutButton.disabled =
-            !authOriginsProjectSelect.value;
+            !authUnitsProjectSelect.value;
         }
       });
 
@@ -1064,8 +1086,6 @@
 
       async function loadAuthOrigins() {
         const projectId = authOriginsProjectSelect.value;
-        authUnitsCheckoutButton.disabled =
-          !projectId || authUnitsCheckoutInProgress;
         const requestId = ++authOriginsRequest;
 
         authOriginsLoadedProjectId = "";
@@ -1118,6 +1138,110 @@
       authOriginsProjectSelect.addEventListener(
         "change",
         loadAuthOrigins
+      );
+
+      let authUnitsUsageRequest = 0;
+
+      async function loadAuthUnitsUsage() {
+        const projectId = authUnitsProjectSelect.value;
+        const requestId = ++authUnitsUsageRequest;
+
+        authUnitsCheckoutButton.disabled =
+          !projectId || authUnitsCheckoutInProgress;
+
+        if (!projectId) {
+          authUnitsUsagePanel.replaceChildren(
+            element("p", {}, "Select a project to view authentication usage.")
+          );
+          return;
+        }
+
+        authUnitsUsagePanel.replaceChildren(
+          element("p", {}, "Loading authentication usage from SEENRO Core…")
+        );
+
+        try {
+          const usage = await api(
+            `/projects/${encodeURIComponent(projectId)}/auth/units/usage`
+          );
+
+          if (
+            authUnitsProjectSelect.value !== projectId ||
+            authUnitsUsageRequest !== requestId
+          ) return;
+
+          const fields = [
+            ["Free units", usage.free_units],
+            ["Purchased units", usage.purchased_units],
+            ["Total units", usage.total_units],
+            ["Units used", usage.used_units],
+            ["Units remaining", usage.remaining_units]
+          ];
+
+          const values = fields.map(([label, raw]) => {
+            const value = Number(raw);
+            if (!Number.isSafeInteger(value) || value < 0) {
+              throw new Error(
+                `SEENRO Core returned an invalid ${label.toLowerCase()} value.`
+              );
+            }
+            return [label, value];
+          });
+
+          const card = (label, value, detail) => {
+            const item = element("article", {
+              className: "portal-usage-card"
+            });
+            item.append(
+              element("span", { className: "portal-usage-label" }, label),
+              element("strong", { className: "portal-usage-value" },
+                value.toLocaleString()
+              ),
+              element("span", { className: "portal-usage-detail" }, detail)
+            );
+            return item;
+          };
+
+          const byName = Object.fromEntries(values);
+          authUnitsUsagePanel.replaceChildren(
+            card("Free allocation", byName["Free units"],
+              "One-time free project allocation"),
+            card("Purchased units", byName["Purchased units"],
+              "Prepaid authentication units"),
+            card("Total units", byName["Total units"],
+              "Free allocation plus purchased units"),
+            card("Units consumed", byName["Units used"],
+              "Unique active customers counted by Core"),
+            card("Units remaining", byName["Units remaining"],
+              "Available authentication units"),
+            element("p", {
+              className: "portal-usage-note"
+            },
+              `Usage is reported by SEENRO Core${
+                typeof usage.usage_timezone === "string"
+                  ? ` using ${usage.usage_timezone}`
+                  : ""
+              }. One unit represents one unique customer active in this project on one UTC calendar day.`
+            )
+          );
+        } catch (error) {
+          if (
+            authUnitsProjectSelect.value === projectId &&
+            authUnitsUsageRequest === requestId
+          ) {
+            authUnitsUsagePanel.replaceChildren(
+              element("p", {},
+                error.message || "Unable to load authentication usage."
+              )
+            );
+            if (error.status === 401) handleWorkspaceError(error);
+          }
+        }
+      }
+
+      authUnitsProjectSelect.addEventListener(
+        "change",
+        loadAuthUnitsUsage
       );
 
       const usageProjectSelect = element("select", {
@@ -1880,6 +2004,7 @@
           const previous = {
             api: projectSelect.value,
             auth: authOriginsProjectSelect.value,
+            authUnits: authUnitsProjectSelect.value,
             storage: storageProjectSelect.value,
             usage: usageProjectSelect.value
           };
@@ -1887,6 +2012,7 @@
           const selectors = [
             projectSelect,
             authOriginsProjectSelect,
+            authUnitsProjectSelect,
             storageProjectSelect,
             usageProjectSelect
           ];
@@ -1923,6 +2049,9 @@
 
           restoreSelection(projectSelect, previous.api);
           restoreSelection(authOriginsProjectSelect, previous.auth, true);
+          restoreSelection(authUnitsProjectSelect, previous.authUnits, true);
+          authUnitsCheckoutButton.disabled =
+            !authUnitsProjectSelect.value || authUnitsCheckoutInProgress;
           restoreSelection(storageProjectSelect, previous.storage);
           restoreSelection(usageProjectSelect, previous.usage);
 
@@ -1930,6 +2059,10 @@
           if (page === "customer-auth") {
             await loadAuthOrigins();
             await loadCustomerAuthUsage();
+          }
+
+          if (page === "dashboard" || page === "customer-auth") {
+            await loadAuthUnitsUsage();
           }
 
           if (page === "dashboard" || page === "storage") {
@@ -2121,7 +2254,8 @@
           refresh,
           projectList,
           usageProjectField,
-          usagePanel
+          usagePanel,
+          authUnitsPanel
         );
       } else if (page === "projects") {
         panel.append(

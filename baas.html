@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Complete SEENRO BaaS platform guide: architecture, projects, APIs, authentication, storage, security, usage and roadmap.">
+  <title>SEENRO BaaS — Complete Platform Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --surface: #f8fafc;
+      --brand: #176b55;
+      --brand-light: #e9f5f0;
+      --warning: #8a5a10;
+      --warning-light: #fff7e6;
+      --blue: #2457a6;
+      --blue-light: #eef4ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--ink);
+      font: 16px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--brand); }
+    .page { width: min(1040px, 100% - 36px); margin: 0 auto; }
+    header { padding: 52px 0 34px; border-bottom: 1px solid var(--line); }
+    .eyebrow {
+      color: var(--brand);
+      font-size: .78rem;
+      font-weight: 750;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    h1 { font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.12; margin: 12px 0; }
+    h2 { margin-top: 48px; padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 1.65rem; }
+    h3 { margin-top: 28px; font-size: 1.15rem; }
+    p, li { color: #344054; }
+    .lead { max-width: 760px; color: var(--muted); font-size: 1.12rem; }
+    .meta { color: var(--muted); font-size: .88rem; }
+    .notice {
+      margin: 24px 0;
+      padding: 16px 18px;
+      border: 1px solid #cfe5da;
+      border-left: 4px solid var(--brand);
+      border-radius: 8px;
+      background: var(--brand-light);
+    }
+    .warning {
+      border-color: #f0d9a9;
+      border-left-color: #c58a24;
+      background: var(--warning-light);
+    }
+    .status {
+      display: inline-block;
+      margin: 3px 5px 3px 0;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: .76rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .available { color: #176b55; background: #e9f5f0; }
+    .verify { color: #2457a6; background: var(--blue-light); }
+    .planned { color: #8a5a10; background: var(--warning-light); }
+    .toc, .panel {
+      padding: 20px 22px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+    .toc ol { columns: 2; padding-left: 22px; }
+    .toc li { break-inside: avoid; margin: 5px 0; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; }
+    th, td { padding: 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--surface); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    code { overflow-wrap: anywhere; }
+    pre {
+      overflow-x: auto;
+      padding: 16px;
+      border-radius: 8px;
+      background: #101827;
+      color: #e5edf7;
+      font-size: .88rem;
+      line-height: 1.55;
+    }
+    .endpoint { font-weight: 700; color: var(--ink); }
+    .muted { color: var(--muted); }
+    footer { margin-top: 60px; padding: 26px 0 44px; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+    @media (max-width: 650px) {
+      .toc ol { columns: 1; }
+      header { padding-top: 34px; }
+      th, td { min-width: 145px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="page">
+      <div class="eyebrow">SEENRO Technology · Developer Documentation</div>
+      <h1>SEENRO BaaS</h1>
+      <p class="lead">Complete platform guide — understand the platform, create projects, integrate services, protect customer data and prepare applications for production.</p>
+      <p class="meta">Platform overview · API integration · Architecture · Security · Availability</p>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="notice">
+      <strong>Read this before integrating.</strong>
+      This guide describes the SEENRO BaaS direction and the implementation details verified for the current documentation. It distinguishes available interfaces from capabilities that still require deployment verification or further development. A design target is not a claim that a production feature is already live.
+    </div>
+
+    <nav class="toc" aria-label="Table of contents">
+      <strong>On this page</strong>
+      <ol>
+        <li><a href="#overview">Platform overview</a></li>
+        <li><a href="#concepts">Core concepts</a></li>
+        <li><a href="#workflow">Developer workflow</a></li>
+        <li><a href="#credentials">Credentials and keys</a></li>
+        <li><a href="#services">Platform services</a></li>
+        <li><a href="#authentication">Customer authentication</a></li>
+        <li><a href="#database">Database and data services</a></li>
+        <li><a href="#storage">Storage and media</a></li>
+        <li><a href="#notifications">Notifications and events</a></li>
+        <li><a href="#security">Security and isolation</a></li>
+        <li><a href="#architecture">Target architecture</a></li>
+        <li><a href="#production">Production checklist</a></li>
+        <li><a href="#availability">Availability and roadmap</a></li>
+        <li><a href="#references">Related documentation</a></li>
+      </ol>
+    </nav>
+
+    <section id="overview">
+      <h2>1. Platform overview</h2>
+      <p>SEENRO Backend as a Service (BaaS) is intended to give independent developers, startups and businesses a common backend platform for building and operating applications.</p>
+      <p>Instead of building every backend component from scratch, a developer should be able to create a SEENRO project and integrate services through documented APIs and, as they become available, supported SDKs.</p>
+      <div class="panel">
+        <strong>The platform vision</strong>
+        <ul>
+          <li>Customer identity and authentication for applications.</li>
+          <li>Project-scoped data and database services.</li>
+          <li>File, image and video storage.</li>
+          <li>APIs, developer credentials and integration tools.</li>
+          <li>Reusable notifications and event-driven services.</li>
+          <li>Project-level quotas, request limits and resource safeguards.</li>
+          <li>Future automation, AI and defensive security services.</li>
+        </ul>
+      </div>
+      <p>SEENRO is an independent platform. Its services, infrastructure, credentials and developer experience are managed as SEENRO products.</p>
+    </section>
+
+    <section id="concepts">
+      <h2>2. Core concepts</h2>
+      <h3>Developer account</h3>
+      <p>A developer account is used to sign in to the SEENRO Developer Portal and manage projects. It is separate from the customer accounts that developers create for users of their own applications.</p>
+      <h3>Project</h3>
+      <p>A project represents an application or backend environment managed by a developer. Project-scoped credentials and resources must not grant access to another project.</p>
+      <h3>Customer</h3>
+      <p>A customer is an end user of an application built by a SEENRO developer. Customer identity and access must remain scoped to the relevant project.</p>
+      <h3>Public project identifier</h3>
+      <p>The public customer-authentication routes use a public project identifier with the <code>proj_pub_</code> prefix. It identifies the project for public client requests; it is not a secret developer credential.</p>
+      <h3>Project API key and Storage API key</h3>
+      <p>These are separate server-side credentials for different API permission systems. A project API key must not be treated as a Storage API key, or vice versa.</p>
+    </section>
+
+    <section id="workflow">
+      <h2>3. Developer workflow</h2>
+      <ol>
+        <li>Create or sign in to a developer account.</li>
+        <li>Create a project for the application.</li>
+        <li>Choose the services the application needs.</li>
+        <li>Configure project credentials and permissions.</li>
+        <li>Keep secret credentials on a trusted backend, never in browser or mobile application source code.</li>
+        <li>Integrate the documented API endpoints.</li>
+        <li>Test authentication, access boundaries, error handling and usage limits.</li>
+        <li>Review deployment status and production readiness before launching.</li>
+      </ol>
+      <p>The exact project-management interface and availability of individual services depend on the deployed portal and Core release.</p>
+    </section>
+
+    <section id="credentials">
+      <h2>4. Credentials and keys</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Credential</th><th>Purpose</th><th>Handling</th></tr></thead>
+          <tbody>
+            <tr><td>Developer account session</td><td>Signs a developer into the portal.</td><td>Keep private; do not share sessions.</td></tr>
+            <tr><td><code>proj_pub_...</code></td><td>Identifies a project for public customer-auth routes.</td><td>Designed for public client use; it does not replace authorization.</td></tr>
+            <tr><td>Project API key</td><td>Authorizes trusted project API operations according to its scopes.</td><td>Server-side secret. Never put it in frontend code.</td></tr>
+            <tr><td><code>st_live_...</code></td><td>Authorizes Storage operations according to Storage permissions.</td><td>Server-side secret. Never expose it to customers.</td></tr>
+            <tr><td>Customer access token</td><td>Authenticates a customer to protected customer routes.</td><td>Protect it as a bearer credential.</td></tr>
+            <tr><td>Temporary upload token</td><td>Authorizes a specific upload operation.</td><td>Short-lived and one-use; do not reuse or log it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Project API key scopes</h3>
+      <p>The inspected project API key scope model includes project, data and authentication read/write scopes. The trusted customer-auth routes are protected by the <code>auth:read</code> and <code>auth:write</code> scope enforcement.</p>
+      <h3>Storage permissions</h3>
+      <ul>
+        <li><code>can_read</code> — permits Storage read operations.</li>
+        <li><code>can_write</code> — permits Storage write and administrative operations.</li>
+        <li><code>can_issue_uploads</code> — permits issuing temporary upload authorizations.</li>
+      </ul>
+      <p>Grant only the permissions required by each server component. Store secrets in a server-side secret manager or protected environment configuration, and rotate credentials if exposure is suspected.</p>
+    </section>
+
+    <section id="services">
+      <h2>5. Platform services</h2>
+      <p>The following service areas define the BaaS product. Their status labels describe the documentation evidence available for this guide, not a live uptime guarantee.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Service</th><th>Purpose</th><th>Documentation status</th></tr></thead>
+          <tbody>
+            <tr><td>Developer projects and API credentials</td><td>Project setup and access credentials.</td><td><span class="status verify">Verify current deployment</span></td></tr>
+            <tr><td>Customer Authentication</td><td>Phone/password customer identity and sessions.</td><td><span class="status available">Routes inspected</span></td></tr>
+            <tr><td>Storage and Media</td><td>Customer file uploads, private media and sharing.</td><td><span class="status available">Routes inspected</span></td></tr>
+            <tr><td>Database BaaS</td><td>Managed project databases and secure data APIs.</td><td><span class="status planned">Target architecture</span></td></tr>
+            <tr><td>Notifications</td><td>Reusable delivery pipeline for platform events.</td><td><span class="status verify">Implementation in progress</span></td></tr>
+            <tr><td>AI and automation</td><td>Future assistants, workflows and automation APIs.</td><td><span class="status planned">Planned</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="authentication">
+      <h2>6. Customer Authentication</h2>
+      <p>SEENRO Customer Authentication is intended for the end users of applications built by developers. It is not the same as developer sign-in to the SEENRO portal.</p>
+      <h3>Customer identity rules</h3>
+      <ul>
+        <li>Phone number and password are the required customer registration and login credentials.</li>
+        <li>Email is optional; it is not the customer login identifier.</li>
+        <li>Customer authentication is scoped to a developer project.</li>
+        <li>Customer access tokens are used for protected customer operations.</li>
+      </ul>
+      <h3>Public customer-authentication routes</h3>
+      <p>These routes are designed for browser and mobile clients and resolve the project using its public project identifier.</p>
+      <pre><code>POST /public/projects/{public_project_id}/auth/register
+POST /public/projects/{public_project_id}/auth/login
+GET  /public/projects/{public_project_id}/auth/me
+POST /public/projects/{public_project_id}/auth/logout</code></pre>
+      <h3>Trusted backend routes</h3>
+      <p>Trusted routes use a project-bound developer API key and the required authentication scope.</p>
+      <pre><code>POST /projects/{project_id}/auth/register
+POST /projects/{project_id}/auth/login
+GET  /projects/{project_id}/auth/me
+POST /projects/{project_id}/auth/logout</code></pre>
+      <p>Customer sessions in the inspected implementation have a seven-day lifetime. Tokens are stored as hashes server-side and are scoped to the project and customer.</p>
+      <div class="notice warning">
+        <strong>Never expose a secret project API key in a browser or mobile application.</strong> Public customer routes use the public project identifier. Trusted routes belong on a developer-controlled backend.
+      </div>
+      <p>See the <a href="customer-auth.html">Customer Authentication Integration Guide</a> for request examples, responses and integration details.</p>
+    </section>
+
+    <section id="database">
+      <h2>7. Database and data services</h2>
+      <p>A complete SEENRO BaaS database service is intended to provide developers with project-scoped data storage, controlled access and APIs for application data.</p>
+      <h3>Target database architecture</h3>
+      <ul>
+        <li>PostgreSQL as the foundation for project database services.</li>
+        <li>Strong separation between platform control-plane data and project application data.</li>
+        <li>Project-scoped database access and authorization.</li>
+        <li>Row-Level Security (RLS) enabled and forced on every applicable project table.</li>
+        <li>Database roles that cannot bypass the intended isolation controls.</li>
+        <li>Transaction-local project and user context rather than trusting client-supplied ownership claims.</li>
+        <li>Backups, restoration procedures and a future point-in-time recovery capability.</li>
+      </ul>
+      <div class="notice warning">
+        <strong>Implementation status:</strong> The PostgreSQL per-project database and RLS architecture described above is a target, not a claim that it is already deployed. The Core implementation inspected during preparation used SQLite. Do not assume that the existing database or legacy Data API provides the complete planned PostgreSQL BaaS experience.
+      </div>
+      <h3>Requirements before database BaaS is production-ready</h3>
+      <ul>
+        <li>Provisioning and lifecycle management for project databases.</li>
+        <li>Verified isolation tests across projects, users and roles.</li>
+        <li>Safe schema migrations and version management.</li>
+        <li>Connection limits, query limits and resource quotas.</li>
+        <li>Backup, restore and disaster-recovery tests.</li>
+        <li>Documented database API, client access model and error behavior.</li>
+      </ul>
+    </section>
+
+    <section id="storage">
+      <h2>8. Storage and Media</h2>
+      <p>SEENRO Storage provides project-scoped file operations and customer media workflows. The inspected implementation includes Storage API keys, temporary upload authorization, customer linking and protected media retrieval.</p>
+      <h3>Customer-to-Storage identity</h3>
+      <p>A developer can associate an external customer identifier with a customer-authentication user in the same project. This mapping allows Storage to associate objects with the correct application customer.</p>
+      <h3>Upload workflow</h3>
+      <ol>
+        <li>The developer's backend requests a temporary upload authorization using a Storage key with the required permission.</li>
+        <li>SEENRO issues a short-lived, one-use upload token.</li>
+        <li>The client uploads the raw file using the temporary token.</li>
+        <li>SEENRO validates the content and enforces applicable limits.</li>
+        <li>The upload response returns file metadata, including the object identifier and content details.</li>
+      </ol>
+      <h3>Inspected media limits</h3>
+      <ul>
+        <li>Supported images: up to 25 MiB.</li>
+        <li>PDF files: up to 50 MiB.</li>
+        <li>MP4, MOV and WebM videos: up to 250 MiB and five minutes.</li>
+        <li>Video size and duration limits are independent.</li>
+      </ul>
+      <p>Private media retrieval uses customer authentication and checks ownership or an active permitted share. It is not intended to expose permanent public URLs for private customer objects.</p>
+      <p>See the <a href="storage-integration.html">Storage Integration Guide</a> for exact endpoints, permissions, upload requests and media access details.</p>
+    </section>
+
+    <section id="notifications">
+      <h2>9. Notifications and events</h2>
+      <p>SEENRO's notification direction is a shared, extensible delivery system for events across Core services—not a worker hard-coded for one feature.</p>
+      <p>The intended design uses a persistent notification/outbox pipeline with reusable delivery, retry, deduplication, templates and event/task registration. New notification types should be able to plug into the shared worker without redesigning the worker engine.</p>
+      <p>Potential event sources include customer authentication, account recovery, Storage events, project activity and future platform services. Actual event types and delivery channels must be documented only after their handlers and deployment are verified.</p>
+      <div class="notice warning">
+        Do not assume that every event, channel, retry policy or notification template described as a future capability is already enabled in production.
+      </div>
+    </section>
+
+    <section id="security">
+      <h2>10. Security and project isolation</h2>
+      <p>Project isolation is a foundational requirement of SEENRO BaaS. A developer must not be able to access another project's customers, records, files, keys or usage data.</p>
+      <h3>Security principles</h3>
+      <ul>
+        <li>Enforce project ownership on the server for every protected operation.</li>
+        <li>Bind secret API keys to a specific project and enforce their permissions.</li>
+        <li>Keep public identifiers separate from secret credentials.</li>
+        <li>Authenticate customer requests and verify ownership before returning private data.</li>
+        <li>Validate uploaded content; do not trust filenames or client-provided content types.</li>
+        <li>Apply rate limits and request-size limits to sensitive endpoints.</li>
+        <li>Store password hashes and session-token hashes rather than plaintext credentials.</li>
+        <li>Protect environment files, signing secrets, database files and backups.</li>
+        <li>Log security-relevant events without logging passwords, tokens or secret keys.</li>
+      </ul>
+      <h3>PostgreSQL isolation target</h3>
+      <p>For the planned PostgreSQL service, every project table must have RLS enabled and forced, with policies based on trusted transaction context. Application roles must not have privileges that bypass those policies. Isolation must be tested directly, including attempts to access another project by changing identifiers.</p>
+      <h3>Security review before launch</h3>
+      <ul>
+        <li>Cross-project authorization tests.</li>
+        <li>Credential scope and revocation tests.</li>
+        <li>Session expiry and logout tests.</li>
+        <li>Rate-limit and abuse tests.</li>
+        <li>Upload validation and one-time-token tests.</li>
+        <li>Backup access and secret exposure review.</li>
+      </ul>
+    </section>
+
+    <section id="architecture">
+      <h2>11. Target platform architecture</h2>
+      <p>The long-term architecture separates platform administration from each developer's application data and services.</p>
+      <div class="panel">
+        <p><strong>Developer Portal</strong><br>Developer accounts, projects, configuration and credentials.</p>
+        <p><strong>SEENRO Core API</strong><br>Project authorization, customer authentication, Storage, data services, notifications and service orchestration.</p>
+        <p><strong>Control plane</strong><br>Developer identities, project registry, service configuration and resource provisioning.</p>
+        <p><strong>Project data plane</strong><br>Isolated project databases, customer data and project-owned resources.</p>
+        <p><strong>Object storage</strong><br>Private customer files and media, with project ownership and controlled access.</p>
+        <p><strong>Background workers</strong><br>Persistent jobs, notifications, retries and future automation tasks.</p>
+      </div>
+      <p>This is the target separation of responsibilities. It should not be interpreted as a complete inventory of currently deployed infrastructure.</p>
+    </section>
+
+    <section id="production">
+      <h2>12. Production readiness checklist</h2>
+      <p>Before an application relies on SEENRO in production, developers should verify the services and operational guarantees they actually need.</p>
+      <ul>
+        <li>Confirm the API base URL and the service release currently deployed.</li>
+        <li>Use separate projects for environments where isolation is required.</li>
+        <li>Keep secret keys on trusted servers and restrict their permissions.</li>
+        <li>Test customer registration, login, logout and session expiry.</li>
+        <li>Test Storage uploads, file validation and private media authorization.</li>
+        <li>Test that one project cannot read another project's data or files.</li>
+        <li>Implement safe retries and handle rate limits and server errors.</li>
+        <li>Monitor application errors, API limits and resource consumption.</li>
+        <li>Confirm backup and restoration arrangements for the services being used.</li>
+        <li>Review service availability and known limitations before launch.</li>
+      </ul>
+    </section>
+
+    <section id="availability">
+      <h2>13. Availability and roadmap</h2>
+      <p>SEENRO is being developed in stages. The labels below prevent planned capabilities from being mistaken for production guarantees.</p>
+      <div class="panel">
+        <p><span class="status available">Implemented routes inspected</span><br>Customer authentication and Storage capabilities described in the linked integration guides.</p>
+        <p><span class="status verify">Verify deployment</span><br>Portal project-management features, API release versions and notification worker behavior must be checked against the current deployed release.</p>
+        <p><span class="status planned">Planned architecture</span><br>Full PostgreSQL project database provisioning, comprehensive RLS-based data isolation, broader SDK coverage, expanded AI and automation services, and additional operational capabilities.</p>
+      </div>
+      <p>Availability can change as releases are deployed. The authoritative integration contract is the API behavior of the specific release a developer is using, together with the current service documentation.</p>
+    </section>
+
+    <section id="references">
+      <h2>14. Related documentation</h2>
+      <ul>
+        <li><a href="docs.html">Main Developer Documentation</a> — documentation index and service guides.</li>
+        <li><a href="customer-auth.html">Customer Authentication Integration</a> — customer registration, login, sessions and protected routes.</li>
+        <li><a href="storage-integration.html">Storage Integration</a> — Storage credentials, customer linking, uploads and private media.</li>
+      </ul>
+      <p class="muted">API base URL used by the current integration guides: <code>https://api.seenrotech.com/api/v1</code>.</p>
+    </section>
+
+    <footer>
+      <strong>SEENRO Technology</strong><br>
+      Independent developer infrastructure for building applications and digital services.<br>
+      <span>Documentation should be updated whenever API behavior, deployment status, limits or product decisions change.</span>
+    </footer>
+  </main>
+</body>
+</html>

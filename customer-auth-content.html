@@ -109,19 +109,6 @@ const customer = await response.json();</code></pre>
     </section>
 
     <section>
-      <h2>Customer Auth usage and credits</h2>
-      <ul>
-        <li>Each project receives 100 free Customer Auth units once.</li>
-        <li>After the free allocation, the proposed unit price is SLE 0.25 per unit.</li>
-        <li>One unit represents one unique customer active in one project on one UTC calendar day.</li>
-        <li>Multiple logins or sessions by the same customer in the same project on the same UTC day count as one unit.</li>
-        <li>The same customer active on another UTC day can consume another unit.</li>
-      </ul>
-      <p class="notice"><strong>Implementation status:</strong> DAU metering and unit enforcement are implemented in the current Core main-branch source. Their availability on the production API depends on which Core release is deployed; check the deployed API release before relying on live metering or quota enforcement.</p>
-      <p>Customer Auth credits are separate from Storage credits and Storage subscriptions. Billing is intended to use SEENRO's existing billing and Monime integration, not a separate billing system.</p>
-    </section>
-
-    <section>
       <h2>Security requirements</h2>
       <ul>
         <li>Keep customer data and sessions within the correct project.</li>

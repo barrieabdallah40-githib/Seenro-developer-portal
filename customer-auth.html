@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Integrate SEENRO customer authentication into your website, mobile app, or backend.">
+  <title>Customer Authentication Integration | SEENRO Developer Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><span class="brand-mark">S</span><span>SEENRO <small>TECHNOLOGY</small></span></a>
+  <nav class="top-nav">
+    <a class="back-link" href="docs.html">Documentation</a>
+    <a class="back-link" href="storage-integration.html">Storage guide</a>
+    <a class="nav-register" href="login.html">Developer portal</a>
+  </nav>
+</header>
+
+<main class="docs-main">
+  <section class="docs-hero">
+    <p class="eyebrow">SEENRO CORE · CUSTOMER AUTHENTICATION</p>
+    <h1>Authenticate your <span>customers.</span></h1>
+    <p class="intro">Integrate customer registration, login, session verification, and logout into websites and mobile applications using SEENRO Application Auth.</p>
+    <p class="docs-meta">API base URL <code>https://api.seenrotech.com/api/v1</code></p>
+    <p class="docs-caution">Customer authentication is separate from developer-portal authentication. Your customers use your application's customer accounts; they do not need SEENRO developer accounts.</p>
+  </section>
+
+  <nav class="docs-toc">
+    <a href="#credentials">What you need</a>
+    <a href="#public">Browser and mobile</a>
+    <a href="#backend">Trusted backend</a>
+    <a href="#sessions">Session lifecycle</a>
+    <a href="#security">Security</a>
+    <a href="#errors">Errors</a>
+  </nav>
+
+  <section class="docs-section" id="credentials">
+    <p class="eyebrow">01 · BEFORE YOU START</p>
+    <h2>Project details and credentials</h2>
+    <p>Create a project in the SEENRO Developer Portal. Obtain the following values from the project workspace.</p>
+    <table class="docs-table">
+      <thead><tr><th>Value</th><th>Purpose</th><th>Where it belongs</th></tr></thead>
+      <tbody>
+        <tr><td><code>https://api.seenrotech.com/api/v1</code></td><td>SEENRO Core API base URL.</td><td>Application configuration.</td></tr>
+        <tr><td><code>proj_pub_...</code></td><td>Public project identifier used by public customer-auth routes.</td><td>May be included in browser and mobile application configuration.</td></tr>
+        <tr><td>Numerical project ID</td><td>Project identifier used by trusted, project-scoped server routes, including Storage.</td><td>Backend configuration.</td></tr>
+        <tr><td>Project API key</td><td>Authorizes permitted trusted server-to-server project operations.</td><td>Backend secret storage only.</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Do not confuse the two project identifiers.</strong> The public identifier begins with <code>proj_pub_</code> and is not the numerical project ID. The public identifier is designed for public customer-auth routes. The numerical ID is used by trusted project routes such as the Storage customer-link and upload-authorization endpoints.</p>
+    <p class="docs-note">Project API keys and Storage API keys are different credentials. A project API key does not automatically grant Storage permissions.</p>
+  </section>
+
+  <section class="docs-section" id="public">
+    <p class="eyebrow">02 · PUBLIC CLIENT INTEGRATION</p>
+    <h2>Browser and mobile applications</h2>
+    <p>Use the public customer-auth routes when registration and login are called directly from a browser or mobile application. These routes resolve the project using its public project identifier and do not require a developer project API key.</p>
+    <h3>Customer registration</h3>
+    <p>Registration requires a phone number and password. Email is optional. Email is not the customer login identifier.</p>
+    <pre><code>POST https://api.seenrotech.com/api/v1/public/projects/proj_pub_YOUR_PUBLIC_ID/auth/register
+Content-Type: application/json
+
+{
+  "phone_number": "+232XXXXXXXX",
+  "email": "customer@example.com",
+  "password": "a-strong-customer-password"
+}</code></pre>
+    <p>A successful registration returns HTTP <code>201</code> and a customer object, an access token, its token type, and the session expiry duration. The response has this shape:</p>
+    <pre><code>{
+  "user": {
+    "id": 123,
+    "phone_number": "+232XXXXXXXX",
+    "email": "customer@example.com",
+    "phone_verified": false
+  },
+  "access_token": "CUSTOMER_SESSION_TOKEN",
+  "token_type": "Bearer",
+  "expires_in": 604800
+}</code></pre>
+    <p>The example user ID and token are illustrative. Use the values returned by your actual API response.</p>
+
+    <h3>Customer login</h3>
+    <p>Customers sign in with their phone number and password.</p>
+    <pre><code>POST https://api.seenrotech.com/api/v1/public/projects/proj_pub_YOUR_PUBLIC_ID/auth/login
+Content-Type: application/json
+
+{
+  "phone_number": "+232XXXXXXXX",
+  "password": "the-customer-password"
+}</code></pre>
+    <p>A successful login returns HTTP <code>200</code>, the customer user information, and a new session access token.</p>
+
+    <h3>Important registration rules</h3>
+    <ul>
+      <li>Phone number and password are the required customer credentials.</li>
+      <li>Email is optional and is not used as the login identifier.</li>
+      <li>Passwords must be between 8 and 128 characters.</li>
+      <li>Keep the returned access token associated with the signed-in customer.</li>
+    </ul>
+  </section>
+
+  <section class="docs-section" id="backend">
+    <p class="eyebrow">03 · TRUSTED SERVER INTEGRATION</p>
+    <h2>Calls made by your backend</h2>
+    <p>SEENRO also exposes project-scoped customer-auth routes for trusted server-to-server integrations. These routes use the numerical project ID and a project-bound API key with the appropriate <code>auth:read</code> or <code>auth:write</code> scope.</p>
+    <pre><code>POST https://api.seenrotech.com/api/v1/projects/NUMERICAL_PROJECT_ID/auth/register
+Authorization: Bearer YOUR_PROJECT_API_KEY
+Content-Type: application/json
+
+{
+  "phone_number": "+232XXXXXXXX",
+  "email": "customer@example.com",
+  "password": "a-strong-customer-password"
+}</code></pre>
+    <p>For backend login, use:</p>
+    <pre><code>POST https://api.seenrotech.com/api/v1/projects/NUMERICAL_PROJECT_ID/auth/login
+Authorization: Bearer YOUR_PROJECT_API_KEY
+Content-Type: application/json
+
+{
+  "phone_number": "+232XXXXXXXX",
+  "password": "the-customer-password"
+}</code></pre>
+    <p>These project-scoped routes require a project API key bound to the same project in the URL. Do not use a key belonging to another project.</p>
+    <p class="docs-warning">Never send a project API key to the browser or mobile application. If a client needs to register or log in directly, use the public <code>/public/projects/{public_project_id}/auth/...</code> routes instead.</p>
+  </section>
+
+  <section class="docs-section" id="sessions">
+    <p class="eyebrow">04 · CUSTOMER SESSION</p>
+    <h2>Verify and end a customer session</h2>
+    <p>Use the customer access token returned by registration or login as a Bearer token for the session routes.</p>
+    <h3>Get the current customer</h3>
+    <pre><code>GET https://api.seenrotech.com/api/v1/public/projects/proj_pub_YOUR_PUBLIC_ID/auth/me
+Authorization: Bearer CUSTOMER_ACCESS_TOKEN</code></pre>
+    <p>The response includes the authenticated customer's user ID, phone number, email where present, and phone-verification status.</p>
+    <h3>Log out</h3>
+    <pre><code>POST https://api.seenrotech.com/api/v1/public/projects/proj_pub_YOUR_PUBLIC_ID/auth/logout
+Authorization: Bearer CUSTOMER_ACCESS_TOKEN</code></pre>
+    <p>A successful logout returns:</p>
+    <pre><code>{
+  "message": "logged out"
+}</code></pre>
+    <p>Equivalent project-scoped routes are available under <code>/projects/{project_id}/auth/...</code> when called with a valid project API key and the customer session token as required by the endpoint.</p>
+    <p>Customer sessions are project-scoped, expire, and are stored server-side as token hashes. Do not assume a token is permanent.</p>
+  </section>
+
+  <section class="docs-section" id="security">
+    <p class="eyebrow">05 · SECURITY PRACTICES</p>
+    <h2>Protect credentials and customer sessions</h2>
+    <ul>
+      <li>Use HTTPS for all production API requests.</li>
+      <li>Keep project API keys in backend environment variables or a secret manager. Never commit them to source control.</li>
+      <li>The public project identifier is not a substitute for a secret key, and a secret key must never be exposed as a public identifier.</li>
+      <li>Do not log customer passwords, access tokens, or secret API keys.</li>
+      <li>Protect customer session tokens against theft. Use secure, platform-appropriate session storage and avoid exposing tokens to untrusted scripts.</li>
+      <li>Validate and authorize sensitive business actions in your own backend. A customer being authenticated does not automatically authorize every action in your application.</li>
+      <li>Do not accept a customer ID or application-user ID from an untrusted client as proof of identity when performing trusted Storage identity linking.</li>
+    </ul>
+    <p class="docs-note">The public customer-auth endpoints are intended to avoid exposing a developer secret to the client. Your own application still needs sound session handling, authorization, input validation, and abuse protection.</p>
+  </section>
+
+  <section class="docs-section" id="errors">
+    <p class="eyebrow">06 · TROUBLESHOOTING</p>
+    <h2>Understand common failures</h2>
+    <table class="docs-table">
+      <thead><tr><th>HTTP status</th><th>What it usually means</th><th>What to check</th></tr></thead>
+      <tbody>
+        <tr><td><code>400</code></td><td>Invalid request data.</td><td>Check required fields, phone number, and password length.</td></tr>
+        <tr><td><code>401</code></td><td>Missing or invalid authentication.</td><td>Check the Bearer token and whether the customer session is still valid.</td></tr>
+        <tr><td><code>403</code></td><td>Insufficient project-key permissions or access denied.</td><td>Check the key's scopes and project association.</td></tr>
+        <tr><td><code>404</code></td><td>Project or requested resource not found.</td><td>Check the project identifier and route.</td></tr>
+        <tr><td><code>409</code></td><td>Conflicting account or resource state.</td><td>Check whether the phone number or requested identity is already in use.</td></tr>
+
+      </tbody>
+    </table>
+
+    <p class="docs-warning">SEENRO Core is in early access. Test registration, login, token expiry, logout, error handling, and your application's authorization logic before production rollout.</p>
+  </section>
+
+  <section class="docs-section docs-help">
+    <h2>Connect authentication to Storage</h2>
+    <p>Use the customer-auth user ID and session token as part of the trusted customer-media integration. Follow the Storage guide for identity linking, upload authorization, and private media viewing.</p>
+    <a class="primary-button" href="storage-integration.html">Open Storage integration guide →</a>
+  </section>
+</main>
+<footer>
+  <a href="https://seenrotech.com/">SEENRO Technology</a>
+  <span>Independent technology initiative · Sierra Leone</span>
+  <span>© 2026 SEENRO Technology</span>
+</footer>
+</body>
+</html>

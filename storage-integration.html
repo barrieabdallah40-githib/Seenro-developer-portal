@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Integrate SEENRO Storage uploads, customer identity, and private media into your application.">
+  <title>Storage Integration Guide | SEENRO Developer Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><span class="brand-mark">S</span><span>SEENRO <small>TECHNOLOGY</small></span></a>
+  <nav class="top-nav">
+    <a class="back-link" href="docs.html">Documentation</a>
+    <a class="back-link" href="customer-auth.html">Customer auth guide</a>
+    <a class="nav-register" href="login.html">Developer portal</a>
+  </nav>
+</header>
+
+<main class="docs-main">
+  <section class="docs-hero">
+    <p class="eyebrow">SEENRO CORE · STORAGE AND CUSTOMER MEDIA</p>
+    <h1>Store and serve <span>customer media.</span></h1>
+    <p class="intro">A complete integration path for linking your application customers to Storage, issuing secure upload authorizations, uploading files, and serving private media.</p>
+    <p class="docs-meta">API base URL <code>https://api.seenrotech.com/api/v1</code></p>
+    <p class="docs-caution">Your trusted backend holds the Storage API key. Your customer-facing application receives only a short-lived, single-use upload token when it needs to upload a file.</p>
+  </section>
+
+  <nav class="docs-toc">
+    <a href="#requirements">Requirements</a>
+    <a href="#keys">Storage keys</a>
+    <a href="#identity">Customer identity</a>
+    <a href="#upload">Upload flow</a>
+    <a href="#view">Private media</a>
+    <a href="#sharing">Sharing</a>
+    <a href="#security">Security</a>
+    <a href="#errors">Errors</a>
+  </nav>
+
+  <section class="docs-section" id="requirements">
+    <p class="eyebrow">01 · INTEGRATION REQUIREMENTS</p>
+    <h2>What your application needs</h2>
+    <table class="docs-table">
+      <thead><tr><th>Value</th><th>Purpose</th><th>Exposure</th></tr></thead>
+      <tbody>
+        <tr><td>API URL</td><td><code>https://api.seenrotech.com/api/v1</code></td><td>Application configuration.</td></tr>
+        <tr><td>Numerical project ID</td><td>Identifies the project in trusted Storage routes.</td><td>Backend configuration.</td></tr>
+        <tr><td>Storage API key</td><td>Authorizes permitted Storage operations.</td><td>Backend secret only.</td></tr>
+        <tr><td>Customer public project ID</td><td>Identifies the project for public customer-auth routes.</td><td>May be public.</td></tr>
+        <tr><td>Customer access token</td><td>Authenticates the customer for private media viewing.</td><td>Customer session credential; protect it.</td></tr>
+        <tr><td>Upload authorization token</td><td>Authorizes one upload.</td><td>Temporary client-side use; never treat as a reusable key.</td></tr>
+      </tbody>
+    </table>
+    <p><strong>There are two project identifiers.</strong> Public customer authentication uses the public identifier beginning <code>proj_pub_</code>. Trusted Storage routes use the numerical project ID. Do not put the public identifier into a route that expects the numerical ID.</p>
+    <p><strong>There are also two different developer key types.</strong> Project API keys authorize project API operations using their project scopes. Storage API keys authorize Storage operations using Storage-specific capabilities. They are not interchangeable.</p>
+  </section>
+
+  <section class="docs-section" id="keys">
+    <p class="eyebrow">02 · STORAGE API KEY</p>
+    <h2>Create a key with the required permissions</h2>
+    <p>In the SEENRO Developer Portal, open your project and its Storage API key management page. Create a Storage API key and enable the permissions needed by your integration.</p>
+    <table class="docs-table">
+      <thead><tr><th>Permission</th><th>What it authorizes</th></tr></thead>
+      <tbody>
+        <tr><td><code>can_read</code></td><td>Storage-key read operations.</td></tr>
+        <tr><td><code>can_write</code></td><td>Storage write and administration operations, including customer linking, group management, group membership, and public-page configuration.</td></tr>
+        <tr><td><code>can_issue_uploads</code></td><td>Issuing temporary customer upload authorizations.</td></tr>
+      </tbody>
+    </table>
+    <p>For the complete customer-media workflow described in this guide, create a key with <code>can_read</code>, <code>can_write</code>, and <code>can_issue_uploads</code>. The permissions are independent; enable only what the backend needs.</p>
+    <p>Storage keys use the <code>st_live_</code> prefix. The full secret is shown only when the key is created. Save it immediately in your backend's environment configuration or secret manager.</p>
+    <p class="docs-warning">Never put an <code>st_live_</code> key in frontend JavaScript, a mobile application bundle, a public repository, or a request sent directly by a customer device.</p>
+  </section>
+
+  <section class="docs-section" id="identity">
+    <p class="eyebrow">03 · CUSTOMER IDENTITY LINKING</p>
+    <h2>Connect Storage customers to Application Auth</h2>
+    <p>Storage customer identity and SEENRO Application Auth identity are related but distinct records. The link allows Core to recognize which authenticated application user owns a customer's private media.</p>
+    <ol class="docs-steps">
+      <li><strong>Authenticate the customer.</strong> Register or log in using SEENRO Application Auth. For browser and mobile clients, use the public customer-auth routes. See the <a href="customer-auth.html">Customer Authentication Integration Guide</a>.</li>
+      <li><strong>Read the trusted identity.</strong> Obtain the customer's <code>user.id</code> and session token from the successful authentication response. The user ID must come from the authenticated SEENRO response, not from an untrusted client-supplied claim.</li>
+      <li><strong>Choose a stable external customer ID.</strong> Your backend should use a stable identifier from your own customer system, such as your own immutable customer record ID. Do not use a value supplied by an unauthenticated client as proof of identity.</li>
+      <li><strong>Link from your backend.</strong> Call the customer-link route using the Storage API key with <code>can_write</code>.</li>
+    </ol>
+    <h3>Customer-link request</h3>
+    <pre><code>POST https://api.seenrotech.com/api/v1/projects/NUMERICAL_PROJECT_ID/storage/customers/link
+Authorization: Bearer YOUR_STORAGE_API_KEY
+Content-Type: application/json
+
+{
+  "external_customer_id": "your-system-customer-123",
+  "application_user_id": 123
+}</code></pre>
+    <p>The field names are important:</p>
+    <ul>
+      <li><code>external_customer_id</code> is your stable external customer identifier.</li>
+      <li><code>application_user_id</code> is the numeric <code>user.id</code> returned by SEENRO Application Auth.</li>
+    </ul>
+    <p>A successful request returns HTTP <code>200</code> with a response in this form:</p>
+    <pre><code>{
+  "customer_linked": true,
+  "storage_customer_id": 456
+}</code></pre>
+    <p>The returned Storage customer ID is a Storage-side identifier. Keep your external customer ID mapping in your trusted backend if your application needs to look it up later.</p>
+    <p class="docs-warning">A customer identity cannot be reassigned to a different application user. If the same external customer identity is already linked to another application user, Core returns HTTP <code>409</code>. Resolve the identity conflict in your own account system; do not work around it by trusting a client-provided user ID.</p>
+  </section>
+
+  <section class="docs-section" id="upload">
+    <p class="eyebrow">04 · CUSTOMER UPLOAD</p>
+    <h2>Issue a one-time upload authorization</h2>
+    <p>After authenticating the customer, your trusted backend requests an upload authorization. The upload-authorization request uses the same stable external customer identity used in your customer-link operation.</p>
+    <h3>Step 1: Request an upload token</h3>
+    <pre><code>POST https://api.seenrotech.com/api/v1/projects/NUMERICAL_PROJECT_ID/storage/uploads
+Authorization: Bearer YOUR_STORAGE_API_KEY
+Content-Type: application/json
+
+{
+  "customer_id": "your-system-customer-123",
+  "max_bytes": 10485760,
+  "expires_in": 900
+}</code></pre>
+    <p>The request fields are:</p>
+    <ul>
+      <li><code>customer_id</code>: the same stable external customer ID used in the customer-link operation.</li>
+      <li><code>max_bytes</code>: optional positive maximum file size in bytes. Values above the server maximum are capped at that maximum.</li>
+      <li><code>expires_in</code>: optional token lifetime in seconds. The supported range is 60 to 3600 seconds; the default is 900 seconds.</li>
+    </ul>
+    <p>The endpoint requires a Storage key with <code>can_issue_uploads</code>. It returns a short-lived <code>stu_live_</code> authorization token, an upload ID, expiry information, the byte limit, and a customer reference.</p>
+    <p class="docs-note">Treat the returned token as a temporary capability. It authorizes exactly one upload and is not a replacement for your Storage API key.</p>
+
+    <h3>Step 2: Upload the file from the client</h3>
+    <p>Return the temporary upload token to the authenticated customer application. The client sends the file bytes directly to the upload endpoint:</p>
+    <pre><code>PUT https://api.seenrotech.com/api/v1/storage/uploads
+Authorization: Bearer TEMPORARY_UPLOAD_TOKEN
+X-Filename: profile-photo.jpg
+Content-Type: image/jpeg
+
+[raw file bytes]</code></pre>
+    <p>Send the raw file body, not a JSON wrapper or a base64 string. Include <code>X-Filename</code>. Send the actual content type when known; otherwise the endpoint supports a default of <code>application/octet-stream</code>.</p>
+    <p>Do not send the Storage API key with this request. The temporary upload token is the upload credential.</p>
+
+    <h3>Step 3: Handle the upload result</h3>
+    <p>Only treat the upload as complete after the upload endpoint reports success. Core streams the bytes, enforces the authorization's byte limit, validates the file content, checks media-specific limits, and checks available Storage capacity before recording the object. An expired, reused, failed, oversized, invalid, or capacity-blocked upload must not be treated as a successful upload.</p>
+    <p class="docs-warning">Do not assume that receiving an upload token means the file has been stored. Your application should handle failed uploads and request a new authorization when appropriate.</p>
+  </section>
+
+  <section class="docs-section" id="view">
+    <p class="eyebrow">05 · PRIVATE MEDIA VIEWING</p>
+    <h2>Serve private media to its owner</h2>
+    <p>Private media is retrieved using the customer's SEENRO Application Auth session—not the developer's Storage API key and not the one-time upload token.</p>
+    <pre><code>GET https://api.seenrotech.com/api/v1/projects/NUMERICAL_PROJECT_ID/storage/media/OBJECT_ID
+Authorization: Bearer CUSTOMER_ACCESS_TOKEN</code></pre>
+    <p>Core checks that the authenticated application user is allowed to view the object. Access is permitted when the user is the linked owner or has an applicable active customer or group share. Revoked and expired shares do not grant access.</p>
+    <p>The response streams the media content. It is not a JSON object containing a permanent public URL. Your application should handle the HTTP response as media content and respect unsuccessful responses such as unauthorized or not-found results.</p>
+    <p class="docs-note">The customer must be linked to the Storage identity before relying on private owner access. The link, upload authorization, and private media request must all refer to the same project and intended customer identity.</p>
+  </section>
+
+  <section class="docs-section" id="sharing">
+    <p class="eyebrow">06 · SHARING AND ACCESS</p>
+    <h2>Extend access without making everything public</h2>
+    <p>SEENRO Storage supports additional sharing mechanisms. These have different authorization rules and should not be treated as interchangeable.</p>
+    <div class="endpoint-list">
+      <div><code>POST /projects/{project_id}/storage/groups</code><span>Create or update a project sharing group. Trusted Storage key with <code>can_write</code>.</span></div>
+      <div><code>POST /projects/{project_id}/storage/groups/{group_key}/members</code><span>Add or remove an application user from a group. Trusted Storage key with <code>can_write</code>.</span></div>
+      <div><code>POST /projects/{project_id}/storage/pages</code><span>Configure a public-facing sharing page. Trusted Storage key with <code>can_write</code>.</span></div>
+      <div><code>POST /projects/{project_id}/storage/shares</code><span>Create a customer-owned share using an authenticated application-user session and ownership checks.</span></div>
+      <div><code>POST /projects/{project_id}/storage/shares/revoke</code><span>Revoke a customer-owned share using an authenticated application-user session.</span></div>
+      <div><code>GET /storage/shared/{token}</code><span>View an active unlisted share using its share token.</span></div>
+      <div><code>GET /storage/public/{project_id}/{page_key}/{object_id}</code><span>View media made available through an enabled public page and valid public-page share.</span></div>
+    </div>
+    <ul>
+      <li>Private media is private by default.</li>
+      <li>Customer share creation and revocation use the authenticated customer session and ownership checks; they are not authorized merely by giving the customer a developer Storage key.</li>
+      <li>Group access depends on membership and an active share.</li>
+      <li>Unlisted shares and enabled public-page shares are distinct access modes.</li>
+      <li>Shares can expire or be revoked. Do not treat a share token as a permanent public object URL.</li>
+    </ul>
+  </section>
+
+  <section class="docs-section" id="security">
+    <p class="eyebrow">07 · SECURITY AND OPERATIONS</p>
+    <h2>Keep the integration safe</h2>
+    <ul>
+      <li>Keep the Storage API key and numerical project configuration on your trusted backend.</li>
+      <li>Never trust a client-submitted <code>application_user_id</code> when linking a customer. Resolve it from the authenticated SEENRO customer identity on the backend.</li>
+      <li>Keep external customer IDs stable and scoped to your own customer records.</li>
+      <li>Do not reuse or store upload tokens as permanent credentials.</li>
+      <li>Use HTTPS, validate customer permissions in your own application, and avoid logging secrets or session tokens.</li>
+      <li>Handle expiry, interrupted uploads, file validation failures, and capacity exhaustion explicitly.</li>
+      <li>Use the least-privilege Storage key permissions your integration needs.</li>
+    </ul>
+    <h3>Current file limits</h3>
+    <p>For customer-media uploads, supported images are limited to 25 MiB, PDFs to 50 MiB, and MP4, MOV, and WebM videos to 250 MiB and five minutes. The separate developer Storage object-upload API has a 100 MiB request limit. Limits depend on the upload route and media type. Video size and duration limits are independent. Core validates uploaded content; do not rely only on the filename or client-supplied content type.</p>
+    <h3>Capacity handling</h3>
+    <p>An issued upload token does not reserve unlimited Storage capacity. Core checks available capacity when processing the upload. A capacity-exhausted upload fails; your application should report the failure and direct the project owner to review Storage usage and capacity.</p>
+  </section>
+
+  <section class="docs-section" id="errors">
+    <p class="eyebrow">08 · TROUBLESHOOTING</p>
+    <h2>Common integration failures</h2>
+    <table class="docs-table">
+      <thead><tr><th>HTTP status</th><th>Possible cause</th><th>What to check</th></tr></thead>
+      <tbody>
+        <tr><td><code>400</code></td><td>Invalid customer mapping, upload request, filename, content type, or upload stream.</td><td>Check exact field names, valid values, and required upload headers.</td></tr>
+        <tr><td><code>401</code></td><td>Missing, invalid, expired, or already-used credential.</td><td>Check whether the request requires a Storage key, customer session, or temporary upload token.</td></tr>
+        <tr><td><code>403</code></td><td>Storage key lacks the required permission or is not authorized for the project.</td><td>Check project binding and the relevant <code>can_read</code>, <code>can_write</code>, or <code>can_issue_uploads</code> permission.</td></tr>
+        <tr><td><code>404</code></td><td>Project, object, customer, or accessible media was not found.</td><td>Check project ID, object ID, identity link, and customer ownership or share access.</td></tr>
+        <tr><td><code>409</code></td><td>External customer identity is already linked to another application user.</td><td>Resolve the customer identity mapping in your trusted backend.</td></tr>
+        <tr><td><code>413</code></td><td>Upload exceeds the permitted size.</td><td>Check the token byte limit and media-specific file limits.</td></tr>
+        <tr><td><code>507</code></td><td>Insufficient Storage capacity.</td><td>Review project Storage usage and available capacity.</td></tr>
+      </tbody>
+    </table>
+    <p class="docs-warning">SEENRO Core is in early access. Test the complete integration—including customer linking, successful and failed uploads, private viewing, sharing, expiry, revocation, and capacity limits—in your own project before production use.</p>
+  </section>
+
+  <section class="docs-section docs-help">
+    <h2>Need the customer authentication steps?</h2>
+    <p>Start with the customer-authentication guide to integrate phone-number and password registration, login, and customer sessions.</p>
+    <a class="primary-button" href="customer-auth.html">Open customer authentication guide →</a>
+  </section>
+</main>
+<footer>
+  <a href="https://seenrotech.com/">SEENRO Technology</a>
+  <span>Independent technology initiative · Sierra Leone</span>
+  <span>© 2026 SEENRO Technology</span>
+</footer>
+</body>
+</html>
